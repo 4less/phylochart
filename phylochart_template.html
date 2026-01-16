@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phylochart Taxon Profiles</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1a1a1a;
+        --muted: #6b6f76;
+        --paper: #f6f1e8;
+        --panel: #ffffff;
+        --accent: #1b5e45;
+        --accent-soft: rgba(27, 94, 69, 0.12);
+        --shadow: 0 20px 50px rgba(15, 22, 26, 0.15);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+        color: var(--ink);
+        background: radial-gradient(
+            circle at 10% 20%,
+            rgba(27, 94, 69, 0.12),
+            transparent 48%
+          ),
+          radial-gradient(circle at 80% 0%, rgba(191, 111, 16, 0.12), transparent 55%),
+          var(--paper);
+      }
+
+      .page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 40px 32px 48px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        align-items: center;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: clamp(1.6rem, 2.5vw, 2.4rem);
+        letter-spacing: -0.02em;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        margin: 0;
+        font-size: 0.98rem;
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--panel);
+        padding: 10px 14px;
+        border-radius: 999px;
+        box-shadow: var(--shadow);
+      }
+
+      label {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      select {
+        font-family: inherit;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(26, 26, 26, 0.15);
+        background: #fff;
+        color: var(--ink);
+        min-width: 140px;
+      }
+
+      .charts {
+        display: grid;
+        grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+        gap: 18px;
+        margin-top: 28px;
+      }
+
+      .chart-card {
+        background: var(--panel);
+        border-radius: 18px;
+        padding: 14px 12px 6px;
+        box-shadow: var(--shadow);
+      }
+
+      .chart-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--muted);
+        margin: 6px 0 10px 6px;
+      }
+
+      #status {
+        margin-top: 16px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 980px) {
+        header {
+          grid-template-columns: 1fr;
+        }
+
+        .controls {
+          justify-self: start;
+        }
+
+        .charts {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <div>
+          <h1>Taxon profiles by sample</h1>
+          <p class="subtitle">
+            Stacked bar view of taxa abundance with rank filtering.
+          </p>
+        </div>
+        <div class="controls">
+          <label for="rankSelect">Rank</label>
+          <select id="rankSelect"></select>
+          <label for="groupSelect">Group by</label>
+          <select id="groupSelect"></select>
+          <label for="taxonOrderSelect">Taxon order</label>
+          <select id="taxonOrderSelect"></select>
+        </div>
+      </header>
+
+      <div class="charts">
+        <div class="chart-card">
+          <div class="chart-title">Relative abundance</div>
+          <div id="relativeChart"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Absolute abundance</div>
+          <div id="absoluteChart"></div>
+        </div>
+      </div>
+
+      <div id="status">Loading embedded taxa data...</div>
+    </div>
+    <!-- TAXA_DATA -->
+
+    <script>
+      const TOP_N = 15;
+      const CHART_MARGIN_TOP = 48;
+      const CHART_MARGIN_BOTTOM = 180;
+      const GROUP_PADDING = 0.06;
+      const POINT_PADDING = 0.02;
+      const PALETTE = [
+        "#1b5e45",
+        "#6b3fa0",
+        "#a34a3b",
+        "#0f7c90",
+        "#d6a21e",
+        "#4372d6",
+        "#bf3a6f",
+        "#1f8f5f",
+        "#8c5e12",
+        "#5862a4",
+        "#b44a1f",
+        "#2180a4",
+        "#6a8f19",
+        "#9b2f2f",
+        "#2c6f62",
+        "#3f3f3f",
+      ];
+
+      const state = {
+        rows: [],
+        ranks: [],
+        metaColumns: [],
+        groupBy: "None",
+        taxonOrder: "total_desc",
+        charts: {},
+      };
+
+      function parseTSV(text) {
+        const lines = text.trim().split(/\r?\n/);
+        const header = lines[0].split("\t");
+        return lines.slice(1).map((line) => {
+          const cols = line.split("\t");
+          const row = {};
+          header.forEach((key, idx) => {
+            row[key] = cols[idx];
+          });
+          row.Abundance = Number(row.Abundance || 0);
+          return row;
+        });
+      }
+
+      function sampleLabel(row) {
+        return row.Sample || `${row.IDGroup}|${row.Source}|${row.Community}|${row.Treatment}`;
+      }
+
+      function getMetaColumns(rows) {
+        if (!rows.length) return [];
+        const excluded = new Set([
+          "Taxon",
+          "Rank",
+          "Abundance",
+          "Type",
+          "Sample",
+        ]);
+        return Object.keys(rows[0]).filter((key) => !excluded.has(key));
+      }
+
+      function isGroupLabel(value) {
+        return typeof value === "string" && value.startsWith("__GROUP__:");
+      }
+
+      function isSpacerLabel(value) {
+        return typeof value === "string" && value.startsWith("__SPACER__:");
+      }
+
+      function groupLabel(value) {
+        return value.replace("__GROUP__:", "");
+      }
+
+      function uniqueRanks(rows) {
+        const seen = new Set();
+        const ranks = [];
+        rows.forEach((row) => {
+          if (!seen.has(row.Rank)) {
+            seen.add(row.Rank);
+            ranks.push(row.Rank);
+          }
+        });
+        return ranks;
+      }
+
+      function orderTaxa(taxaTotals, baseType, order) {
+        const entries = [...taxaTotals[baseType].entries()];
+        if (order === "alphabetical") {
+          return entries
+            .map(([taxon]) => taxon)
+            .sort((a, b) => a.localeCompare(b));
+        }
+        if (order === "total_asc") {
+          return entries
+            .sort((a, b) => a[1] - b[1])
+            .map(([taxon]) => taxon);
+        }
+        return entries
+          .sort((a, b) => b[1] - a[1])
+          .map(([taxon]) => taxon);
+      }
+
+      function computeRankData(rank, groupBy, taxonOrder) {
+        const samples = [];
+        const sampleIndex = new Map();
+        const types = ["RelativeAbundance", "AbsoluteAbundance"];
+        const sampleTaxa = {
+          RelativeAbundance: new Map(),
+          AbsoluteAbundance: new Map(),
+        };
+        const taxaTotals = {
+          RelativeAbundance: new Map(),
+          AbsoluteAbundance: new Map(),
+        };
+        const sampleMeta = new Map();
+
+        state.rows.forEach((row) => {
+          if (row.Rank !== rank) return;
+          const type = row.Type || "RelativeAbundance";
+          if (!types.includes(type)) return;
+          const sample = sampleLabel(row);
+          if (!sampleIndex.has(sample)) {
+            sampleIndex.set(sample, samples.length);
+            samples.push(sample);
+          }
+          if (!sampleMeta.has(sample)) {
+            sampleMeta.set(sample, row);
+          }
+
+          if (!sampleTaxa[type].has(sample)) {
+            sampleTaxa[type].set(sample, new Map());
+          }
+
+          const taxonMap = sampleTaxa[type].get(sample);
+          const current = taxonMap.get(row.Taxon) || 0;
+          taxonMap.set(row.Taxon, current + row.Abundance);
+          taxaTotals[type].set(
+            row.Taxon,
+            (taxaTotals[type].get(row.Taxon) || 0) + row.Abundance
+          );
+        });
+
+        const baseType = taxaTotals.RelativeAbundance.size
+          ? "RelativeAbundance"
+          : "AbsoluteAbundance";
+        const sortedTaxa = orderTaxa(taxaTotals, baseType, taxonOrder);
+
+        const topTaxa = sortedTaxa.slice(0, TOP_N);
+        const hasOther = sortedTaxa.length > TOP_N;
+        const taxaList = hasOther ? [...topTaxa, "Other"] : topTaxa;
+
+        const buildSeries = (type, order, groupFlags) =>
+          taxaList.map((taxon, idx) => {
+            const data = order.map((sample, index) => {
+              if (groupFlags[index]) return null;
+              const taxonMap = sampleTaxa[type].get(sample) || new Map();
+              let value = 0;
+              if (taxon === "Other") {
+                sortedTaxa.slice(TOP_N).forEach((otherTaxon) => {
+                  value += taxonMap.get(otherTaxon) || 0;
+                });
+              } else {
+                value = taxonMap.get(taxon) || 0;
+              }
+              return value;
+            });
+            return {
+              name: taxon,
+              data,
+              color: PALETTE[idx % PALETTE.length],
+            };
+          });
+
+        const order = [];
+        const groupFlags = [];
+        if (groupBy && groupBy !== "None") {
+          const grouped = new Map();
+          samples.forEach((sample) => {
+            const meta = sampleMeta.get(sample) || {};
+            const value = meta[groupBy] || "(Missing)";
+            if (!grouped.has(value)) {
+              grouped.set(value, []);
+            }
+            grouped.get(value).push(sample);
+          });
+          const groupKeys = [...grouped.keys()].sort((a, b) =>
+            String(a).localeCompare(String(b))
+          );
+          groupKeys.forEach((key) => {
+            const groupSamples = grouped.get(key).slice().sort();
+            order.push(`__GROUP__:${key}`);
+            groupFlags.push(true);
+            groupSamples.forEach((sample) => {
+              order.push(sample);
+              groupFlags.push(false);
+            });
+            order.push(`__SPACER__:${key}`);
+            groupFlags.push(true);
+          });
+        } else {
+          samples
+            .slice()
+            .sort()
+            .forEach((sample) => {
+              order.push(sample);
+              groupFlags.push(false);
+            });
+        }
+
+        return {
+          samples: order,
+          relativeSeries: buildSeries("RelativeAbundance", order, groupFlags),
+          absoluteSeries: buildSeries("AbsoluteAbundance", order, groupFlags),
+        };
+      }
+
+      function renderCharts(rank, groupBy, taxonOrder) {
+        const data = computeRankData(rank, groupBy, taxonOrder);
+        const height = Math.max(360, data.samples.length * 18 + 120);
+
+        state.charts.relative = Highcharts.chart("relativeChart", {
+          chart: {
+            type: "bar",
+            height,
+            backgroundColor: "transparent",
+            marginTop: CHART_MARGIN_TOP,
+            marginBottom: CHART_MARGIN_BOTTOM,
+          },
+          title: { text: null },
+          subtitle: { text: `Rank: ${rank}` },
+          xAxis: {
+            categories: data.samples,
+            title: { text: null },
+            labels: {
+              style: { fontSize: "11px" },
+              useHTML: true,
+              formatter: function () {
+                if (isSpacerLabel(this.value)) return "";
+                if (isGroupLabel(this.value)) {
+                  return `<span style="font-weight:700;color:#4a4f57;display:block;margin:6px 0 2px;">${groupLabel(
+                    this.value
+                  )}</span>`;
+                }
+                return this.value;
+              },
+            },
+          },
+          yAxis: {
+            min: 0,
+            max: 1,
+            title: { text: "Relative abundance" },
+            labels: {
+              formatter: function () {
+                return (this.value * 100).toFixed(0) + "%";
+              },
+            },
+          },
+          legend: {
+            align: "center",
+            verticalAlign: "bottom",
+            layout: "horizontal",
+            itemMarginTop: 6,
+            itemMarginBottom: 6,
+          },
+          tooltip: {
+            shared: true,
+            valueDecimals: 4,
+            pointFormatter: function () {
+              const pct = (this.y * 100).toFixed(2);
+              return `<span style="color:${this.color}">\u25CF</span> ${this.series.name}: <b>${pct}%</b><br/>`;
+            },
+          },
+          plotOptions: {
+            series: {
+              stacking: "normal",
+              borderWidth: 0,
+              groupPadding: GROUP_PADDING,
+              pointPadding: POINT_PADDING,
+            },
+          },
+          series: data.relativeSeries,
+          credits: { enabled: false },
+        });
+
+        state.charts.absolute = Highcharts.chart("absoluteChart", {
+          chart: {
+            type: "bar",
+            height,
+            backgroundColor: "transparent",
+            marginTop: CHART_MARGIN_TOP,
+            marginBottom: CHART_MARGIN_BOTTOM,
+          },
+          title: { text: null },
+          subtitle: { text: "Raw abundance" },
+          xAxis: {
+            categories: data.samples,
+            title: { text: null },
+            labels: {
+              useHTML: true,
+              formatter: function () {
+                if (isSpacerLabel(this.value)) return "";
+                if (isGroupLabel(this.value)) {
+                  return `<span style="font-weight:700;color:#4a4f57;display:block;margin:6px 0 2px;">${groupLabel(
+                    this.value
+                  )}</span>`;
+                }
+                return "";
+              },
+            },
+          },
+          yAxis: {
+            min: 0,
+            title: { text: "Abundance" },
+          },
+          legend: { enabled: false },
+          tooltip: {
+            shared: true,
+            valueDecimals: 4,
+          },
+          plotOptions: {
+            series: {
+              stacking: "normal",
+              borderWidth: 0,
+              groupPadding: GROUP_PADDING,
+              pointPadding: POINT_PADDING,
+            },
+          },
+          series: data.absoluteSeries,
+          credits: { enabled: false },
+        });
+      }
+
+      function init() {
+        try {
+          const text = document.getElementById("taxaData").textContent;
+          state.rows = parseTSV(text);
+          state.ranks = uniqueRanks(state.rows);
+
+          const rankSelect = document.getElementById("rankSelect");
+          rankSelect.innerHTML = "";
+          state.ranks.forEach((rank) => {
+            const option = document.createElement("option");
+            option.value = rank;
+            option.textContent = rank;
+            rankSelect.appendChild(option);
+          });
+
+          state.metaColumns = getMetaColumns(state.rows);
+          const groupSelect = document.getElementById("groupSelect");
+          groupSelect.innerHTML = "";
+          ["None", ...state.metaColumns].forEach((column) => {
+            const option = document.createElement("option");
+            option.value = column;
+            option.textContent = column;
+            groupSelect.appendChild(option);
+          });
+
+          rankSelect.addEventListener("change", (event) => {
+            renderCharts(event.target.value, state.groupBy, state.taxonOrder);
+          });
+          groupSelect.addEventListener("change", (event) => {
+            state.groupBy = event.target.value;
+            renderCharts(rankSelect.value, state.groupBy, state.taxonOrder);
+          });
+
+          const taxonOrderSelect = document.getElementById("taxonOrderSelect");
+          taxonOrderSelect.innerHTML = "";
+          [
+            { value: "total_desc", label: "Total abundance (desc)" },
+            { value: "total_asc", label: "Total abundance (asc)" },
+            { value: "alphabetical", label: "Alphabetical" },
+          ].forEach((item) => {
+            const option = document.createElement("option");
+            option.value = item.value;
+            option.textContent = item.label;
+            taxonOrderSelect.appendChild(option);
+          });
+          taxonOrderSelect.addEventListener("change", (event) => {
+            state.taxonOrder = event.target.value;
+            renderCharts(rankSelect.value, state.groupBy, state.taxonOrder);
+          });
+
+          const defaultRank = state.ranks.includes("Genus")
+            ? "Genus"
+            : state.ranks[0];
+          rankSelect.value = defaultRank;
+          groupSelect.value = "None";
+          taxonOrderSelect.value = state.taxonOrder;
+          renderCharts(defaultRank, state.groupBy, state.taxonOrder);
+          document.getElementById("status").textContent =
+            "Loaded " + state.rows.length + " rows.";
+        } catch (err) {
+          document.getElementById("status").textContent =
+            "Failed to load data: " + err;
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
