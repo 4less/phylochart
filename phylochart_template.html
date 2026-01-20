@@ -11,6 +11,7 @@
       rel="stylesheet"
     />
     <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/highcharts-more.js"></script>
     <style>
       :root {
         color-scheme: light;
@@ -47,10 +48,10 @@
       }
 
       header {
-        display: grid;
-        grid-template-columns: 1fr auto;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
         gap: 16px;
-        align-items: center;
       }
 
       h1 {
@@ -68,11 +69,18 @@
       .controls {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 16px;
         background: var(--panel);
-        padding: 10px 14px;
+        padding: 20px 22px;
         border-radius: 999px;
         box-shadow: var(--shadow);
+        width: 100%;
+        flex-wrap: wrap;
+        position: sticky;
+        top: 12px;
+        z-index: 6;
+        margin-top: 28px;
+        justify-content: center;
       }
 
       label {
@@ -91,6 +99,28 @@
         min-width: 140px;
       }
 
+      input[type="number"] {
+        font-family: inherit;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(26, 26, 26, 0.15);
+        background: #fff;
+        color: var(--ink);
+        width: 90px;
+      }
+
+      button {
+        font-family: inherit;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(26, 26, 26, 0.15);
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
       .charts {
         display: grid;
         grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
@@ -105,11 +135,45 @@
         box-shadow: var(--shadow);
       }
 
+      .chart-card.full-width {
+        grid-column: 1 / -1;
+      }
+
       .chart-title {
         font-weight: 600;
         font-size: 0.95rem;
         color: var(--muted);
         margin: 6px 0 10px 6px;
+      }
+
+      #taxonChartPanel {
+        display: grid;
+        gap: 12px;
+      }
+
+      #taxonChartPanel.facets {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
+      .panel-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 8px 6px;
+        flex-wrap: wrap;
+        position: sticky;
+        top: 12px;
+        z-index: 5;
+        background: var(--panel);
+        padding: 8px 10px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(15, 22, 26, 0.08);
+      }
+
+      .sample-toggle-wrapper {
+        display: flex;
+        justify-content: center;
+        margin: 12px 0 6px;
       }
 
       #status {
@@ -141,15 +205,20 @@
             Stacked bar view of taxa abundance with rank filtering.
           </p>
         </div>
-        <div class="controls">
-          <label for="rankSelect">Rank</label>
-          <select id="rankSelect"></select>
-          <label for="groupSelect">Group by</label>
-          <select id="groupSelect"></select>
-          <label for="taxonOrderSelect">Taxon order</label>
-          <select id="taxonOrderSelect"></select>
-        </div>
       </header>
+      <div class="controls">
+        <label for="rankSelect">Rank</label>
+        <select id="rankSelect"></select>
+        <label for="groupSelect">Group by</label>
+        <select id="groupSelect"></select>
+        <label for="taxonOrderSelect">Taxon order</label>
+        <select id="taxonOrderSelect"></select>
+        <label for="taxonPinSelect">Pin taxon</label>
+        <select id="taxonPinSelect"></select>
+        <label for="topNInput">Top N</label>
+        <input id="topNInput" type="number" min="1" step="1" value="15" />
+        <button id="taxonRefresh" type="button">Refresh</button>
+      </div>
 
       <div class="charts">
         <div class="chart-card">
@@ -159,6 +228,26 @@
         <div class="chart-card">
           <div class="chart-title">Absolute abundance</div>
           <div id="absoluteChart"></div>
+        </div>
+      </div>
+      <div class="sample-toggle-wrapper">
+        <button id="sampleToggle" type="button">Show all</button>
+      </div>
+      <div class="charts">
+        <div class="chart-card full-width">
+          <div class="chart-title">Selected taxon by condition</div>
+          <div class="panel-controls">
+            <label for="conditionSelect">x-Axis</label>
+            <select id="conditionSelect"></select>
+            <label for="abundanceTypeSelect">Abundance</label>
+            <select id="abundanceTypeSelect"></select>
+            <label for="taxonScaleSelect">Scale</label>
+            <select id="taxonScaleSelect"></select>
+            <label for="colorConditionSelect">Facet by</label>
+            <select id="colorConditionSelect"></select>
+            <button id="taxonRefreshPanel" type="button">Refresh</button>
+          </div>
+          <div id="taxonChartPanel"></div>
         </div>
       </div>
 
@@ -172,6 +261,7 @@
       const CHART_MARGIN_BOTTOM = 180;
       const GROUP_PADDING = 0.06;
       const POINT_PADDING = 0.02;
+      const LEGEND_MARGIN_PAD = 90;
       const PALETTE = [
         "#1b5e45",
         "#6b3fa0",
@@ -197,6 +287,19 @@
         metaColumns: [],
         groupBy: "None",
         taxonOrder: "total_desc",
+        pinnedTaxon: null,
+        legendMarginBottom: CHART_MARGIN_BOTTOM,
+        taxonCondition: "All",
+        taxonAbundanceType: "RelativeAbundance",
+        taxonScale: "linear",
+        taxonColorCondition: "All",
+        topN: 15,
+        sampleLimit: 10,
+        showAllSamples: false,
+        mainPending: null,
+        mainDirty: false,
+        taxonPending: null,
+        taxonDirty: false,
         charts: {},
       };
 
@@ -210,6 +313,7 @@
             row[key] = cols[idx];
           });
           row.Abundance = Number(row.Abundance || 0);
+          row.All = "All";
           return row;
         });
       }
@@ -234,6 +338,46 @@
         return typeof value === "string" && value.startsWith("__GROUP__:");
       }
 
+      function limitSampleOrder(order, limit) {
+        if (!Number.isFinite(limit) || limit <= 0) {
+          return { order, groupFlags: order.map((value) => isSpacerLabel(value) || isGroupLabel(value)) };
+        }
+        const trimmed = [];
+        const flags = [];
+        let count = 0;
+        let currentGroup = null;
+        let groupHasSample = false;
+        let groupLabelAdded = false;
+
+        order.forEach((value) => {
+          if (isGroupLabel(value)) {
+            currentGroup = value;
+            groupHasSample = false;
+            groupLabelAdded = false;
+            return;
+          }
+          if (isSpacerLabel(value)) {
+            if (groupHasSample) {
+              trimmed.push(value);
+              flags.push(true);
+            }
+            currentGroup = null;
+            return;
+          }
+          if (count >= limit) return;
+          if (currentGroup && !groupLabelAdded) {
+            trimmed.push(currentGroup);
+            flags.push(true);
+            groupLabelAdded = true;
+          }
+          trimmed.push(value);
+          flags.push(false);
+          groupHasSample = true;
+          count += 1;
+        });
+
+        return { order: trimmed, groupFlags: flags };
+      }
       function isSpacerLabel(value) {
         return typeof value === "string" && value.startsWith("__SPACER__:");
       }
@@ -254,6 +398,69 @@
         return ranks;
       }
 
+      function taxaForRank(rows, rank) {
+        const seen = new Set();
+        rows.forEach((row) => {
+          if (row.Rank !== rank) return;
+          if (!seen.has(row.Taxon)) {
+            seen.add(row.Taxon);
+          }
+        });
+        return [...seen].sort((a, b) => a.localeCompare(b));
+      }
+
+      function hasTypeForRank(rank, targetType) {
+        return state.rows.some((row) => {
+          if (row.Rank !== rank) return false;
+          const type = row.Type || "RelativeAbundance";
+          return type === targetType;
+        });
+      }
+
+      function resolveBaseType(rank) {
+        let hasRelative = false;
+        state.rows.forEach((row) => {
+          if (row.Rank !== rank) return;
+          const type = row.Type || "RelativeAbundance";
+          if (type === "RelativeAbundance") {
+            hasRelative = true;
+          }
+        });
+        return hasRelative ? "RelativeAbundance" : "AbsoluteAbundance";
+      }
+
+      function quantile(sorted, q) {
+        if (!sorted.length) return 0;
+        const pos = (sorted.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (sorted[base + 1] !== undefined) {
+          return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+        }
+        return sorted[base];
+      }
+
+      function computeBoxStats(values) {
+        if (!values.length) return null;
+        const sorted = values.slice().sort((a, b) => a - b);
+        const min = sorted[0];
+        const max = sorted[sorted.length - 1];
+        const q1 = quantile(sorted, 0.25);
+        const median = quantile(sorted, 0.5);
+        const q3 = quantile(sorted, 0.75);
+        return [min, q1, median, q3, max];
+      }
+
+      function stableJitter(seed, amplitude) {
+        let hash = 0;
+        for (let i = 0; i < seed.length; i += 1) {
+          hash = (hash << 5) - hash + seed.charCodeAt(i);
+          hash |= 0;
+        }
+        const unit = (hash >>> 0) / 0xffffffff;
+        return (unit - 0.5) * amplitude;
+      }
+
       function orderTaxa(taxaTotals, baseType, order) {
         const entries = [...taxaTotals[baseType].entries()];
         if (order === "alphabetical") {
@@ -271,7 +478,7 @@
           .map(([taxon]) => taxon);
       }
 
-      function computeRankData(rank, groupBy, taxonOrder) {
+      function computeRankData(rank, groupBy, taxonOrder, pinnedTaxon, topN, sampleLimit) {
         const samples = [];
         const sampleIndex = new Map();
         const types = ["RelativeAbundance", "AbsoluteAbundance"];
@@ -316,9 +523,13 @@
           : "AbsoluteAbundance";
         const sortedTaxa = orderTaxa(taxaTotals, baseType, taxonOrder);
 
-        const topTaxa = sortedTaxa.slice(0, TOP_N);
-        const hasOther = sortedTaxa.length > TOP_N;
-        const taxaList = hasOther ? [...topTaxa, "Other"] : topTaxa;
+        const cutoff = Math.max(1, Number(topN) || TOP_N);
+        const topTaxa = sortedTaxa.slice(0, cutoff);
+        const hasOther = sortedTaxa.length > cutoff;
+        let taxaList = hasOther ? [...topTaxa, "Other"] : topTaxa;
+        if (pinnedTaxon && taxaList.includes(pinnedTaxon)) {
+          taxaList = [pinnedTaxon, ...taxaList.filter((t) => t !== pinnedTaxon)];
+        }
 
         const buildSeries = (type, order, groupFlags) =>
           taxaList.map((taxon, idx) => {
@@ -327,7 +538,7 @@
               const taxonMap = sampleTaxa[type].get(sample) || new Map();
               let value = 0;
               if (taxon === "Other") {
-                sortedTaxa.slice(TOP_N).forEach((otherTaxon) => {
+                sortedTaxa.slice(cutoff).forEach((otherTaxon) => {
                   value += taxonMap.get(otherTaxon) || 0;
                 });
               } else {
@@ -378,15 +589,409 @@
             });
         }
 
+        const limitValue = Number.isFinite(sampleLimit) ? sampleLimit : state.sampleLimit;
+        const limited = state.showAllSamples
+          ? { order, groupFlags }
+          : limitSampleOrder(order, limitValue);
+
         return {
-          samples: order,
-          relativeSeries: buildSeries("RelativeAbundance", order, groupFlags),
-          absoluteSeries: buildSeries("AbsoluteAbundance", order, groupFlags),
+          samples: limited.order,
+          relativeSeries: buildSeries(
+            "RelativeAbundance",
+            limited.order,
+            limited.groupFlags
+          ),
+          absoluteSeries: buildSeries(
+            "AbsoluteAbundance",
+            limited.order,
+            limited.groupFlags
+          ),
+          taxaList,
         };
       }
 
+      function updatePinOptions(rank, groupBy, taxonOrder) {
+        const data = computeRankData(
+          rank,
+          groupBy,
+          taxonOrder,
+          null,
+          state.topN,
+          state.sampleLimit
+        );
+        const taxonPinSelect = document.getElementById("taxonPinSelect");
+        taxonPinSelect.innerHTML = "";
+        ["None", ...data.taxaList].forEach((taxon) => {
+          const option = document.createElement("option");
+          option.value = taxon;
+          option.textContent = taxon;
+          taxonPinSelect.appendChild(option);
+        });
+        if (state.pinnedTaxon && !data.taxaList.includes(state.pinnedTaxon)) {
+          state.pinnedTaxon = null;
+        }
+        taxonPinSelect.value = state.pinnedTaxon || "None";
+      }
+
+      function renderTaxonPanel(rank) {
+        const condition = state.taxonCondition;
+        const taxon = state.pinnedTaxon;
+        const baseType = state.taxonAbundanceType;
+        const scaleType = state.taxonScale;
+        const epsilon = baseType === "RelativeAbundance" ? 1e-6 : 1e-2;
+        const colorCondition = state.taxonColorCondition;
+        const panel = document.getElementById("taxonChartPanel");
+
+        const renderEmpty = (message) => {
+          panel.classList.remove("facets");
+          panel.innerHTML = '<div id="taxonChart"></div>';
+          state.charts.taxon = Highcharts.chart("taxonChart", {
+            chart: {
+              type: "boxplot",
+              height: 360,
+              backgroundColor: "transparent",
+            },
+            title: { text: null },
+            subtitle: { text: message },
+            xAxis: { categories: [] },
+            yAxis: { title: { text: "" } },
+            legend: { enabled: false },
+            series: [],
+            credits: { enabled: false },
+          });
+        };
+
+        if (!taxon) {
+          renderEmpty("Select a taxon in the plot or dropdown.");
+          return;
+        }
+
+        if (!hasTypeForRank(rank, baseType)) {
+          renderEmpty("No data for the selected abundance type.");
+          return;
+        }
+
+        const sampleMeta = new Map();
+        const sampleValues = new Map();
+        const sampleSet = new Set();
+        state.rows.forEach((row) => {
+          if (row.Rank !== rank) return;
+          const type = row.Type || "RelativeAbundance";
+          if (type !== baseType) return;
+          const sample = sampleLabel(row);
+          sampleSet.add(sample);
+          if (!sampleMeta.has(sample)) {
+            sampleMeta.set(sample, row);
+          }
+          if (row.Taxon !== taxon) return;
+          sampleValues.set(sample, (sampleValues.get(sample) || 0) + row.Abundance);
+        });
+
+        const grouped = new Map();
+        const statsBuckets = new Map();
+        sampleSet.forEach((sample) => {
+          const meta = sampleMeta.get(sample) || {};
+          const xKey =
+            condition && condition !== "All"
+              ? meta[condition] || "(Missing)"
+              : "All";
+          if (!grouped.has(xKey)) {
+            grouped.set(xKey, []);
+          }
+          grouped.get(xKey).push(sample);
+
+          const colorKey =
+            colorCondition && colorCondition !== "All"
+              ? meta[colorCondition] || "(Missing)"
+              : "All";
+          if (!statsBuckets.has(colorKey)) {
+            statsBuckets.set(colorKey, new Map());
+          }
+          const colorMap = statsBuckets.get(colorKey);
+          if (!colorMap.has(xKey)) {
+            colorMap.set(xKey, []);
+          }
+          const rawValue = sampleValues.get(sample) || 0;
+          const adjustedValue =
+            scaleType === "log"
+              ? rawValue <= 0
+                ? epsilon
+                : rawValue
+              : rawValue;
+          colorMap.get(xKey).push(adjustedValue);
+        });
+
+        const categories = [...grouped.keys()].sort((a, b) =>
+          String(a).localeCompare(String(b))
+        );
+        const categoryIndex = new Map();
+        categories.forEach((key, index) => {
+          categoryIndex.set(key, index);
+        });
+
+        const colorKeys = [...statsBuckets.keys()].sort((a, b) =>
+          String(a).localeCompare(String(b))
+        );
+
+        const formatAxisLabel = function () {
+          if (scaleType === "log") {
+            if (baseType === "RelativeAbundance") {
+              const pct = this.value * 100;
+              if (pct < 0.01) return "<0.01%";
+              if (pct < 0.1) return pct.toFixed(2) + "%";
+              if (pct < 1) return pct.toFixed(1) + "%";
+              return pct.toFixed(0) + "%";
+            }
+            return Highcharts.numberFormat(this.value, 2);
+          }
+          if (baseType !== "RelativeAbundance") return this.value;
+          return (this.value * 100).toFixed(0) + "%";
+        };
+
+        const buildAxisMax = (stats) => {
+          const dataMax = stats.length
+            ? Math.max(...stats.filter(Boolean).map((row) => row[4]))
+            : null;
+          const maxValue =
+            dataMax === null
+              ? null
+              : baseType === "RelativeAbundance"
+                ? Math.min(1, dataMax * 1.05)
+                : dataMax * 1.05;
+          return scaleType === "log" && maxValue !== null
+            ? Math.max(maxValue, epsilon * 10)
+            : maxValue;
+        };
+
+        if (colorCondition && colorCondition !== "All") {
+          const facetKeys = colorKeys;
+          panel.classList.add("facets");
+          panel.innerHTML = facetKeys
+            .map((key, idx) => `<div id="taxonFacet-${idx}"></div>`)
+            .join("");
+          facetKeys.forEach((key, idx) => {
+            const valuesByCategory = statsBuckets.get(key) || new Map();
+            const stats = categories.map((category) =>
+              computeBoxStats(valuesByCategory.get(category) || [])
+            );
+            const scatter = [];
+            sampleSet.forEach((sample) => {
+              const meta = sampleMeta.get(sample) || {};
+              const colorKey =
+                colorCondition && colorCondition !== "All"
+                  ? meta[colorCondition] || "(Missing)"
+                  : "All";
+              if (colorKey !== key) return;
+              const xKey =
+                condition && condition !== "All"
+                  ? meta[condition] || "(Missing)"
+                  : "All";
+              const xIndex = categoryIndex.get(xKey);
+              if (xIndex === undefined) return;
+              const rawValue = sampleValues.get(sample) || 0;
+              const adjustedValue =
+                scaleType === "log"
+                  ? rawValue <= 0
+                    ? epsilon
+                    : rawValue
+                  : rawValue;
+              scatter.push({
+                x: xIndex + stableJitter(sample, 0.18),
+                y: adjustedValue,
+                name: sample,
+                rawValue,
+              });
+            });
+
+            Highcharts.chart(`taxonFacet-${idx}`, {
+              chart: {
+                type: "boxplot",
+                height: 320,
+                backgroundColor: "transparent",
+              },
+              title: { text: key },
+              xAxis: {
+                categories,
+                title: { text: condition === "All" ? "" : condition },
+              },
+              yAxis: {
+                type: scaleType === "log" ? "logarithmic" : "linear",
+                min: scaleType === "log" ? epsilon : 0,
+                max: buildAxisMax(stats),
+                title: { text: null },
+                labels: { formatter: formatAxisLabel },
+              },
+              legend: { enabled: false },
+              tooltip: {
+                formatter: function () {
+                  const formatValue =
+                    baseType === "RelativeAbundance"
+                      ? (value) => (value * 100).toFixed(2) + "%"
+                      : (value) => Highcharts.numberFormat(value, 2);
+                  if (this.point && this.point.high !== undefined) {
+                    return [
+                      `<b>${this.category}</b><br/>`,
+                      `Min: ${formatValue(this.point.low)}<br/>`,
+                      `Q1: ${formatValue(this.point.q1)}<br/>`,
+                      `Median: ${formatValue(this.point.median)}<br/>`,
+                      `Q3: ${formatValue(this.point.q3)}<br/>`,
+                      `Max: ${formatValue(this.point.high)}`,
+                    ].join("");
+                  }
+                  const value = this.point.rawValue ?? this.y;
+                  return [
+                    `<b>${this.point.name}</b><br/>`,
+                    `${formatValue(value)}`,
+                  ].join("");
+                },
+              },
+              series: [
+                {
+                  name: taxon,
+                  data: stats.filter(Boolean),
+                  color: PALETTE[0],
+                  lineWidth: 1.5,
+                },
+                {
+                  type: "scatter",
+                  name: key,
+                  data: scatter,
+                  color: PALETTE[3],
+                  marker: { radius: 3, lineWidth: 0 },
+                  showInLegend: false,
+                },
+              ],
+              credits: { enabled: false },
+            });
+          });
+          return;
+        }
+
+        panel.classList.remove("facets");
+        panel.innerHTML = '<div id="taxonChart"></div>';
+        const baseBucket =
+          statsBuckets.get("All") || [...statsBuckets.values()][0] || new Map();
+        const stats = categories.map((category) =>
+          computeBoxStats(baseBucket.get(category) || [])
+        );
+        const scatter = sampleSet
+          .map((sample) => {
+            const meta = sampleMeta.get(sample) || {};
+            const xKey =
+              condition && condition !== "All"
+                ? meta[condition] || "(Missing)"
+                : "All";
+            const xIndex = categoryIndex.get(xKey);
+            if (xIndex === undefined) return null;
+            const rawValue = sampleValues.get(sample) || 0;
+            const adjustedValue =
+              scaleType === "log"
+                ? rawValue <= 0
+                  ? epsilon
+                  : rawValue
+                : rawValue;
+            return {
+              x: xIndex + stableJitter(sample, 0.18),
+              y: adjustedValue,
+              name: sample,
+              rawValue,
+            };
+          })
+          .filter(Boolean);
+
+        state.charts.taxon = Highcharts.chart("taxonChart", {
+          chart: {
+            type: "boxplot",
+            height: 360,
+            backgroundColor: "transparent",
+          },
+          plotOptions: {
+            boxplot: {
+              pointPadding: 0.1,
+              groupPadding: 0.12,
+              whiskerLength: "60%",
+              medianWidth: 2,
+            },
+            scatter: {
+              marker: { radius: 3, lineWidth: 0 },
+            },
+          },
+          title: { text: null },
+          subtitle: {
+            text:
+              baseType === "RelativeAbundance"
+                ? `${taxon} (relative abundance)`
+                : `${taxon} (abundance)`,
+          },
+          xAxis: {
+            categories,
+            title: { text: condition === "All" ? "" : condition },
+          },
+          yAxis: {
+            type: scaleType === "log" ? "logarithmic" : "linear",
+            min: scaleType === "log" ? epsilon : 0,
+            max: buildAxisMax(stats),
+            title: {
+              text:
+                baseType === "RelativeAbundance"
+                  ? "Relative abundance"
+                  : "Abundance",
+            },
+            labels: { formatter: formatAxisLabel },
+          },
+          legend: { enabled: false },
+          tooltip: {
+            formatter: function () {
+              const formatValue =
+                baseType === "RelativeAbundance"
+                  ? (value) => (value * 100).toFixed(2) + "%"
+                  : (value) => Highcharts.numberFormat(value, 2);
+              if (this.point && this.point.high !== undefined) {
+                return [
+                  `<b>${this.category}</b><br/>`,
+                  `Min: ${formatValue(this.point.low)}<br/>`,
+                  `Q1: ${formatValue(this.point.q1)}<br/>`,
+                  `Median: ${formatValue(this.point.median)}<br/>`,
+                  `Q3: ${formatValue(this.point.q3)}<br/>`,
+                  `Max: ${formatValue(this.point.high)}`,
+                ].join("");
+              }
+              const value = this.point.rawValue ?? this.y;
+              return [
+                `<b>${this.point.name}</b><br/>`,
+                `${formatValue(value)}`,
+              ].join("");
+            },
+          },
+          series: [
+            {
+              name: taxon,
+              data: stats.filter(Boolean),
+              color: PALETTE[0],
+              lineWidth: 1.5,
+            },
+            {
+              type: "scatter",
+              name: taxon,
+              data: scatter,
+              color: PALETTE[3],
+              marker: { radius: 3, lineWidth: 0 },
+              showInLegend: false,
+            },
+          ],
+          credits: { enabled: false },
+        });
+      }
+
       function renderCharts(rank, groupBy, taxonOrder) {
-        const data = computeRankData(rank, groupBy, taxonOrder);
+        const data = computeRankData(
+          rank,
+          groupBy,
+          taxonOrder,
+          state.pinnedTaxon,
+          state.topN,
+          state.sampleLimit
+        );
         const height = Math.max(360, data.samples.length * 18 + 120);
 
         state.charts.relative = Highcharts.chart("relativeChart", {
@@ -396,6 +1001,32 @@
             backgroundColor: "transparent",
             marginTop: CHART_MARGIN_TOP,
             marginBottom: CHART_MARGIN_BOTTOM,
+            events: {
+              render: function () {
+                if (!this.legend || !this.legend.group) return;
+                const legendHeight =
+                  this.legend.legendHeight ||
+                  this.legend.group.getBBox().height;
+                const desired = Math.max(
+                  CHART_MARGIN_BOTTOM,
+                  legendHeight + LEGEND_MARGIN_PAD
+                );
+                if (this.extraBottomMargin !== desired) {
+                  this.extraBottomMargin = desired;
+                  state.legendMarginBottom = desired;
+                  this.update({ chart: { marginBottom: desired } }, false);
+                }
+                if (
+                  state.charts.absolute &&
+                  state.charts.absolute.marginBottom !== state.legendMarginBottom
+                ) {
+                  state.charts.absolute.update(
+                    { chart: { marginBottom: state.legendMarginBottom } },
+                    false
+                  );
+                }
+              },
+            },
           },
           title: { text: null },
           subtitle: { text: `Rank: ${rank}` },
@@ -435,10 +1066,20 @@
           },
           tooltip: {
             shared: true,
-            valueDecimals: 4,
-            pointFormatter: function () {
-              const pct = (this.y * 100).toFixed(2);
-              return `<span style="color:${this.color}">\u25CF</span> ${this.series.name}: <b>${pct}%</b><br/>`;
+            useHTML: true,
+            formatter: function () {
+              const hoverPoint = this.points?.[0]?.series?.chart?.hoverPoint;
+              const hoverTaxon = hoverPoint ? hoverPoint.series.name : null;
+              let html = `<span style="font-size:12px">${this.x}</span><br/>`;
+              if (hoverTaxon) {
+                html += `<span style="font-weight:600">Taxon: ${hoverTaxon}</span><br/>`;
+              }
+              this.points?.forEach((point) => {
+                if (point.y === null || typeof point.y === "undefined") return;
+                const pct = (point.y * 100).toFixed(2);
+                html += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${pct}%</b><br/>`;
+              });
+              return html;
             },
           },
           plotOptions: {
@@ -447,6 +1088,19 @@
               borderWidth: 0,
               groupPadding: GROUP_PADDING,
               pointPadding: POINT_PADDING,
+              cursor: "pointer",
+              point: {
+                events: {
+                  click: function () {
+                    state.pinnedTaxon = this.series.name;
+                    const taxonPinSelect = document.getElementById("taxonPinSelect");
+                    if (taxonPinSelect) {
+                      taxonPinSelect.value = state.pinnedTaxon;
+                    }
+                    renderCharts(rank, state.groupBy, state.taxonOrder);
+                  },
+                },
+              },
             },
           },
           series: data.relativeSeries,
@@ -459,7 +1113,23 @@
             height,
             backgroundColor: "transparent",
             marginTop: CHART_MARGIN_TOP,
-            marginBottom: CHART_MARGIN_BOTTOM,
+            marginBottom: state.legendMarginBottom,
+            events: {
+              render: function () {
+                if (!this.legend || !this.legend.group) return;
+                const legendHeight =
+                  this.legend.legendHeight ||
+                  this.legend.group.getBBox().height;
+                const desired = Math.max(
+                  CHART_MARGIN_BOTTOM,
+                  legendHeight + LEGEND_MARGIN_PAD
+                );
+                if (this.extraBottomMargin !== desired) {
+                  this.extraBottomMargin = desired;
+                  this.update({ chart: { marginBottom: desired } }, false);
+                }
+              },
+            },
           },
           title: { text: null },
           subtitle: { text: "Raw abundance" },
@@ -486,7 +1156,21 @@
           legend: { enabled: false },
           tooltip: {
             shared: true,
-            valueDecimals: 4,
+            useHTML: true,
+            formatter: function () {
+              const hoverPoint = this.points?.[0]?.series?.chart?.hoverPoint;
+              const hoverTaxon = hoverPoint ? hoverPoint.series.name : null;
+              let html = `<span style="font-size:12px">${this.x}</span><br/>`;
+              if (hoverTaxon) {
+                html += `<span style="font-weight:600">Taxon: ${hoverTaxon}</span><br/>`;
+              }
+              this.points?.forEach((point) => {
+                if (point.y === null || typeof point.y === "undefined") return;
+                const value = Highcharts.numberFormat(point.y, 2);
+                html += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${value}</b><br/>`;
+              });
+              return html;
+            },
           },
           plotOptions: {
             series: {
@@ -494,11 +1178,25 @@
               borderWidth: 0,
               groupPadding: GROUP_PADDING,
               pointPadding: POINT_PADDING,
+              cursor: "pointer",
+              point: {
+                events: {
+                  click: function () {
+                    state.pinnedTaxon = this.series.name;
+                    const taxonPinSelect = document.getElementById("taxonPinSelect");
+                    if (taxonPinSelect) {
+                      taxonPinSelect.value = state.pinnedTaxon;
+                    }
+                    renderCharts(rank, state.groupBy, state.taxonOrder);
+                  },
+                },
+              },
             },
           },
           series: data.absoluteSeries,
           credits: { enabled: false },
         });
+
       }
 
       function init() {
@@ -526,12 +1224,21 @@
             groupSelect.appendChild(option);
           });
 
+          const mainRefreshButton = document.getElementById("taxonRefresh");
+          const updateMainRefreshState = () => {
+            mainRefreshButton.disabled = !state.mainDirty;
+          };
+
           rankSelect.addEventListener("change", (event) => {
-            renderCharts(event.target.value, state.groupBy, state.taxonOrder);
+            state.mainPending.rank = event.target.value;
+            state.mainPending.pinnedTaxon = null;
+            state.mainDirty = true;
+            updateMainRefreshState();
           });
           groupSelect.addEventListener("change", (event) => {
-            state.groupBy = event.target.value;
-            renderCharts(rankSelect.value, state.groupBy, state.taxonOrder);
+            state.mainPending.groupBy = event.target.value;
+            state.mainDirty = true;
+            updateMainRefreshState();
           });
 
           const taxonOrderSelect = document.getElementById("taxonOrderSelect");
@@ -547,8 +1254,74 @@
             taxonOrderSelect.appendChild(option);
           });
           taxonOrderSelect.addEventListener("change", (event) => {
-            state.taxonOrder = event.target.value;
-            renderCharts(rankSelect.value, state.groupBy, state.taxonOrder);
+            state.mainPending.taxonOrder = event.target.value;
+            state.mainDirty = true;
+            updateMainRefreshState();
+          });
+
+          if (!state.metaColumns.includes("All")) {
+            state.metaColumns.unshift("All");
+          }
+          const conditionSelect = document.getElementById("conditionSelect");
+          conditionSelect.innerHTML = "";
+          state.metaColumns.forEach((column) => {
+            const option = document.createElement("option");
+            option.value = column;
+            option.textContent = column;
+            conditionSelect.appendChild(option);
+          });
+          const refreshPanelButton = document.getElementById("taxonRefreshPanel");
+          const updateTaxonRefreshState = () => {
+            refreshPanelButton.disabled = !state.taxonDirty;
+          };
+
+          state.taxonCondition = state.metaColumns[0] || "All";
+          state.taxonColorCondition = "All";
+          state.taxonPending = {
+            condition: state.taxonCondition,
+            abundanceType: state.taxonAbundanceType,
+            scale: state.taxonScale,
+            colorCondition: state.taxonColorCondition,
+          };
+          conditionSelect.value = state.taxonPending.condition;
+          conditionSelect.addEventListener("change", (event) => {
+            state.taxonPending.condition = event.target.value;
+            state.taxonDirty = true;
+            updateTaxonRefreshState();
+          });
+
+          const taxonPinSelect = document.getElementById("taxonPinSelect");
+          taxonPinSelect.addEventListener("change", (event) => {
+            state.mainPending.pinnedTaxon =
+              event.target.value === "None" ? null : event.target.value;
+            state.mainDirty = true;
+            updateMainRefreshState();
+            state.taxonDirty = true;
+            updateTaxonRefreshState();
+          });
+
+          const topNInput = document.getElementById("topNInput");
+          topNInput.value = String(state.topN);
+          topNInput.addEventListener("change", (event) => {
+            const nextValue = parseInt(event.target.value, 10);
+            state.mainPending.topN = Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 15;
+            event.target.value = String(state.mainPending.topN);
+            state.mainDirty = true;
+            updateMainRefreshState();
+          });
+
+          const sampleToggle = document.getElementById("sampleToggle");
+          const updateSampleToggle = () => {
+            sampleToggle.textContent = state.mainPending.showAllSamples
+              ? "Collapse"
+              : "Show all";
+          };
+          updateSampleToggle();
+          sampleToggle.addEventListener("click", () => {
+            state.mainPending.showAllSamples = !state.mainPending.showAllSamples;
+            updateSampleToggle();
+            state.mainDirty = true;
+            updateMainRefreshState();
           });
 
           const defaultRank = state.ranks.includes("Genus")
@@ -557,7 +1330,100 @@
           rankSelect.value = defaultRank;
           groupSelect.value = "None";
           taxonOrderSelect.value = state.taxonOrder;
+          updatePinOptions(defaultRank, state.groupBy, state.taxonOrder);
+          const abundanceTypeSelect = document.getElementById("abundanceTypeSelect");
+          abundanceTypeSelect.innerHTML = "";
+          [
+            { value: "RelativeAbundance", label: "Relative abundance" },
+            { value: "AbsoluteAbundance", label: "Absolute abundance" },
+          ].forEach((item) => {
+            const option = document.createElement("option");
+            option.value = item.value;
+            option.textContent = item.label;
+            abundanceTypeSelect.appendChild(option);
+          });
+          state.taxonAbundanceType = hasTypeForRank(defaultRank, "RelativeAbundance")
+            ? "RelativeAbundance"
+            : "AbsoluteAbundance";
+          abundanceTypeSelect.value = state.taxonAbundanceType;
+          state.taxonPending.abundanceType = state.taxonAbundanceType;
+          abundanceTypeSelect.addEventListener("change", (event) => {
+            state.taxonPending.abundanceType = event.target.value;
+            state.taxonDirty = true;
+            updateTaxonRefreshState();
+          });
+          const taxonScaleSelect = document.getElementById("taxonScaleSelect");
+          taxonScaleSelect.innerHTML = "";
+          [
+            { value: "linear", label: "Linear" },
+            { value: "log", label: "Log" },
+          ].forEach((item) => {
+            const option = document.createElement("option");
+            option.value = item.value;
+            option.textContent = item.label;
+            taxonScaleSelect.appendChild(option);
+          });
+          taxonScaleSelect.value = state.taxonScale;
+          state.taxonPending.scale = state.taxonScale;
+          taxonScaleSelect.addEventListener("change", (event) => {
+            state.taxonPending.scale = event.target.value;
+            state.taxonDirty = true;
+            updateTaxonRefreshState();
+          });
+          const colorConditionSelect = document.getElementById("colorConditionSelect");
+          colorConditionSelect.innerHTML = "";
+          state.metaColumns.forEach((column) => {
+            const option = document.createElement("option");
+            option.value = column;
+            option.textContent = column;
+            colorConditionSelect.appendChild(option);
+          });
+          colorConditionSelect.value = state.taxonColorCondition;
+          state.taxonPending.colorCondition = state.taxonColorCondition;
+          colorConditionSelect.addEventListener("change", (event) => {
+            state.taxonPending.colorCondition = event.target.value;
+            state.taxonDirty = true;
+            updateTaxonRefreshState();
+          });
+          const applyTaxonRefresh = () => {
+            state.taxonCondition = state.taxonPending.condition;
+            state.taxonAbundanceType = state.taxonPending.abundanceType;
+            state.taxonScale = state.taxonPending.scale;
+            state.taxonColorCondition = state.taxonPending.colorCondition;
+            state.taxonDirty = false;
+            updateTaxonRefreshState();
+            const scrollY = window.scrollY;
+            renderTaxonPanel(rankSelect.value);
+            requestAnimationFrame(() => window.scrollTo(0, scrollY));
+          };
+          refreshPanelButton.addEventListener("click", applyTaxonRefresh);
+          updateTaxonRefreshState();
+
+          state.mainPending = {
+            rank: defaultRank,
+            groupBy: state.groupBy,
+            taxonOrder: state.taxonOrder,
+            pinnedTaxon: state.pinnedTaxon,
+            topN: state.topN,
+            showAllSamples: state.showAllSamples,
+          };
+          updateMainRefreshState();
+          mainRefreshButton.addEventListener("click", () => {
+            state.groupBy = state.mainPending.groupBy;
+            state.taxonOrder = state.mainPending.taxonOrder;
+            state.pinnedTaxon = state.mainPending.pinnedTaxon;
+            state.topN = state.mainPending.topN;
+            state.showAllSamples = state.mainPending.showAllSamples;
+            state.mainDirty = false;
+            updateMainRefreshState();
+            updatePinOptions(state.mainPending.rank, state.groupBy, state.taxonOrder);
+            taxonPinSelect.value = state.pinnedTaxon || "None";
+            renderCharts(state.mainPending.rank, state.groupBy, state.taxonOrder);
+            state.taxonDirty = true;
+            updateTaxonRefreshState();
+          });
           renderCharts(defaultRank, state.groupBy, state.taxonOrder);
+          renderTaxonPanel(defaultRank);
           document.getElementById("status").textContent =
             "Loaded " + state.rows.length + " rows.";
         } catch (err) {
