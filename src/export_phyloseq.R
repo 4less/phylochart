@@ -88,6 +88,14 @@ if (!(opts$types %in% allowed_types)) {
 taxon_rel_df <- tibble()
 taxon_abs_df <- tibble()
 
+
+has_absolute <- {
+  ma <- phyloseq::sample_sums(ps) %>% mean()
+  ma > 110 & ma < 90
+}
+
+message(phyloseq::sample_sums(ps) %>% mean())
+
 if (opts$types %in% c("relative", "both")) {
   taxon_rel_df <- ranks %>%
     map(~ {
@@ -104,7 +112,7 @@ if (opts$types %in% c("relative", "both")) {
     list_rbind()
 }
 
-if (opts$types %in% c("absolute", "both")) {
+if (opts$types %in% c("absolute", "both") & has_absolute) {
   taxon_abs_df <- ranks %>%
     map(~ {
       taxrank <- .x

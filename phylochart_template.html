@@ -54,6 +54,11 @@
         gap: 16px;
       }
 
+      .logo {
+        height: 44px;
+        width: auto;
+      }
+
       h1 {
         margin: 0 0 6px;
         font-size: clamp(1.6rem, 2.5vw, 2.4rem);
@@ -128,6 +133,50 @@
         margin-top: 28px;
       }
 
+      .charts.single {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .loading-container {
+        position: relative;
+      }
+
+      .loading-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.88);
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: var(--muted);
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        z-index: 20;
+        pointer-events: all;
+        backdrop-filter: blur(1px);
+      }
+
+      .loading-overlay[hidden] {
+        display: none !important;
+      }
+
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgba(27, 94, 69, 0.2);
+        border-top-color: var(--accent);
+        animation: spin 0.9s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
       .chart-card {
         background: var(--panel);
         border-radius: 18px;
@@ -200,7 +249,11 @@
     <div class="page">
       <header>
         <div>
-          <h1>Taxon profiles by sample</h1>
+          <img
+            src="assets/logo_horizonal_export_white.svg"
+            alt="Taxon profiles by sample"
+            class="logo"
+          />
           <p class="subtitle">
             Stacked bar view of taxa abundance with rank filtering.
           </p>
@@ -220,21 +273,25 @@
         <button id="taxonRefresh" type="button">Refresh</button>
       </div>
 
-      <div class="charts">
+      <div class="charts loading-container" id="mainCharts">
         <div class="chart-card">
           <div class="chart-title">Relative abundance</div>
           <div id="relativeChart"></div>
         </div>
-        <div class="chart-card">
+        <div class="chart-card" id="absoluteCard">
           <div class="chart-title">Absolute abundance</div>
           <div id="absoluteChart"></div>
+        </div>
+        <div class="loading-overlay" id="mainChartsLoading" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          Loading taxon profiles...
         </div>
       </div>
       <div class="sample-toggle-wrapper">
         <button id="sampleToggle" type="button">Show all</button>
       </div>
       <div class="charts">
-        <div class="chart-card full-width">
+        <div class="chart-card full-width loading-container" id="taxonPanelCard">
           <div class="chart-title">Selected taxon by condition</div>
           <div class="panel-controls">
             <label for="conditionSelect">x-Axis</label>
@@ -248,6 +305,10 @@
             <button id="taxonRefreshPanel" type="button">Refresh</button>
           </div>
           <div id="taxonChartPanel"></div>
+          <div class="loading-overlay" id="taxonPanelLoading" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            Loading selected taxon...
+          </div>
         </div>
       </div>
 
@@ -296,6 +357,7 @@
         topN: 15,
         sampleLimit: 10,
         showAllSamples: false,
+        activeRank: null,
         mainPending: null,
         mainDirty: false,
         taxonPending: null,
@@ -303,17 +365,23 @@
         charts: {},
       };
 
+      // Parse embedded TSV into row objects and ensure an "All" column exists.
       function parseTSV(text) {
         const lines = text.trim().split(/\r?\n/);
         const header = lines[0].split("\t");
+        const hasAll = header.includes("All");
+        const fullHeader = hasAll ? header : [...header, "All"];
         return lines.slice(1).map((line) => {
           const cols = line.split("\t");
           const row = {};
-          header.forEach((key, idx) => {
+          fullHeader.forEach((key, idx) => {
+            if (key === "All") {
+              row[key] = "All";
+              return;
+            }
             row[key] = cols[idx];
           });
           row.Abundance = Number(row.Abundance || 0);
-          row.All = "All";
           return row;
         });
       }
@@ -729,6 +797,17 @@
           categoryIndex.set(key, index);
         });
 
+        const toFullStats = (stats, fullCategories, localCategories) => {
+          if (fullCategories.length === localCategories.length) {
+            return stats;
+          }
+          const statMap = new Map();
+          localCategories.forEach((value, idx) => {
+            statMap.set(value, stats[idx] ?? null);
+          });
+          return fullCategories.map((value) => statMap.get(value) ?? null);
+        };
+
         const colorKeys = [...statsBuckets.keys()].sort((a, b) =>
           String(a).localeCompare(String(b))
         );
@@ -763,18 +842,14 @@
             : maxValue;
         };
 
-        if (colorCondition && colorCondition !== "All") {
-          const facetKeys = colorKeys;
+        if (colorCondition) {
+          const facetKeys = colorCondition === "All" ? ["All"] : colorKeys;
           panel.classList.add("facets");
           panel.innerHTML = facetKeys
             .map((key, idx) => `<div id="taxonFacet-${idx}"></div>`)
             .join("");
           facetKeys.forEach((key, idx) => {
-            const valuesByCategory = statsBuckets.get(key) || new Map();
-            const stats = categories.map((category) =>
-              computeBoxStats(valuesByCategory.get(category) || [])
-            );
-            const scatter = [];
+            const pointBuckets = new Map();
             sampleSet.forEach((sample) => {
               const meta = sampleMeta.get(sample) || {};
               const colorKey =
@@ -786,8 +861,9 @@
                 condition && condition !== "All"
                   ? meta[condition] || "(Missing)"
                   : "All";
-              const xIndex = categoryIndex.get(xKey);
-              if (xIndex === undefined) return;
+              if (!pointBuckets.has(xKey)) {
+                pointBuckets.set(xKey, []);
+              }
               const rawValue = sampleValues.get(sample) || 0;
               const adjustedValue =
                 scaleType === "log"
@@ -795,11 +871,41 @@
                     ? epsilon
                     : rawValue
                   : rawValue;
-              scatter.push({
-                x: xIndex + stableJitter(sample, 0.18),
-                y: adjustedValue,
-                name: sample,
+              pointBuckets.get(xKey).push({
+                sample,
                 rawValue,
+                adjustedValue,
+              });
+            });
+
+            const localCategories =
+              colorCondition === condition && condition !== "All"
+                ? [key]
+                : categories;
+            const localCategoryIndex = new Map();
+            localCategories.forEach((value, index) => {
+              localCategoryIndex.set(value, index);
+            });
+            const localStats = localCategories.map((category) => {
+              const points = pointBuckets.get(category) || [];
+              const values =
+                scaleType === "log"
+                  ? points.filter((p) => p.rawValue > 0).map((p) => p.rawValue)
+                  : points.map((p) => p.rawValue);
+              return computeBoxStats(values);
+            });
+            const stats = toFullStats(localStats, categories, localCategories);
+            const scatter = [];
+            pointBuckets.forEach((points, xKey) => {
+              const xIndex = categoryIndex.get(xKey);
+              if (xIndex === undefined) return;
+              points.forEach((point) => {
+                scatter.push({
+                  x: xIndex + stableJitter(point.sample, 0.18),
+                  y: point.adjustedValue,
+                  name: point.sample,
+                  rawValue: point.rawValue,
+                });
               });
             });
 
@@ -816,7 +922,7 @@
               },
               yAxis: {
                 type: scaleType === "log" ? "logarithmic" : "linear",
-                min: scaleType === "log" ? epsilon : 0,
+                min: scaleType === "log" ? epsilon / 10 : 0,
                 max: buildAxisMax(stats),
                 title: { text: null },
                 labels: { formatter: formatAxisLabel },
@@ -848,7 +954,7 @@
               series: [
                 {
                   name: taxon,
-                  data: stats.filter(Boolean),
+                  data: stats,
                   color: PALETTE[0],
                   lineWidth: 1.5,
                 },
@@ -869,35 +975,50 @@
 
         panel.classList.remove("facets");
         panel.innerHTML = '<div id="taxonChart"></div>';
-        const baseBucket =
-          statsBuckets.get("All") || [...statsBuckets.values()][0] || new Map();
-        const stats = categories.map((category) =>
-          computeBoxStats(baseBucket.get(category) || [])
-        );
-        const scatter = sampleSet
-          .map((sample) => {
-            const meta = sampleMeta.get(sample) || {};
-            const xKey =
-              condition && condition !== "All"
-                ? meta[condition] || "(Missing)"
-                : "All";
-            const xIndex = categoryIndex.get(xKey);
-            if (xIndex === undefined) return null;
-            const rawValue = sampleValues.get(sample) || 0;
-            const adjustedValue =
-              scaleType === "log"
-                ? rawValue <= 0
-                  ? epsilon
-                  : rawValue
-                : rawValue;
-            return {
-              x: xIndex + stableJitter(sample, 0.18),
-              y: adjustedValue,
-              name: sample,
-              rawValue,
-            };
-          })
-          .filter(Boolean);
+        const pointBuckets = new Map();
+        sampleSet.forEach((sample) => {
+          const meta = sampleMeta.get(sample) || {};
+          const xKey =
+            condition && condition !== "All"
+              ? meta[condition] || "(Missing)"
+              : "All";
+          if (!pointBuckets.has(xKey)) {
+            pointBuckets.set(xKey, []);
+          }
+          const rawValue = sampleValues.get(sample) || 0;
+          const adjustedValue =
+            scaleType === "log"
+              ? rawValue <= 0
+                ? epsilon
+                : rawValue
+              : rawValue;
+          pointBuckets.get(xKey).push({
+            sample,
+            rawValue,
+            adjustedValue,
+          });
+        });
+        const stats = categories.map((category) => {
+          const points = pointBuckets.get(category) || [];
+          const values =
+            scaleType === "log"
+              ? points.filter((p) => p.rawValue > 0).map((p) => p.rawValue)
+              : points.map((p) => p.rawValue);
+          return computeBoxStats(values);
+        });
+        const scatter = [];
+        pointBuckets.forEach((points, xKey) => {
+          const xIndex = categoryIndex.get(xKey);
+          if (xIndex === undefined) return;
+          points.forEach((point) => {
+            scatter.push({
+              x: xIndex + stableJitter(point.sample, 0.18),
+              y: point.adjustedValue,
+              name: point.sample,
+              rawValue: point.rawValue,
+            });
+          });
+        });
 
         state.charts.taxon = Highcharts.chart("taxonChart", {
           chart: {
@@ -929,7 +1050,7 @@
           },
           yAxis: {
             type: scaleType === "log" ? "logarithmic" : "linear",
-            min: scaleType === "log" ? epsilon : 0,
+            min: scaleType === "log" ? epsilon / 10 : 0,
             max: buildAxisMax(stats),
             title: {
               text:
@@ -966,7 +1087,7 @@
           series: [
             {
               name: taxon,
-              data: stats.filter(Boolean),
+              data: stats,
               color: PALETTE[0],
               lineWidth: 1.5,
             },
@@ -984,6 +1105,7 @@
       }
 
       function renderCharts(rank, groupBy, taxonOrder) {
+        state.activeRank = rank;
         const data = computeRankData(
           rank,
           groupBy,
@@ -992,6 +1114,19 @@
           state.topN,
           state.sampleLimit
         );
+        const hasAbsolute = hasTypeForRank(rank, "AbsoluteAbundance");
+        const chartsContainer = document.getElementById("mainCharts");
+        const absoluteCard = document.getElementById("absoluteCard");
+        if (chartsContainer) {
+          chartsContainer.classList.toggle("single", !hasAbsolute);
+        }
+        if (absoluteCard) {
+          absoluteCard.hidden = !hasAbsolute;
+        }
+        if (!hasAbsolute && state.charts.absolute) {
+          state.charts.absolute.destroy();
+          state.charts.absolute = null;
+        }
         const height = Math.max(360, data.samples.length * 18 + 120);
 
         state.charts.relative = Highcharts.chart("relativeChart", {
@@ -1107,6 +1242,10 @@
           credits: { enabled: false },
         });
 
+        if (!hasAbsolute) {
+          return;
+        }
+
         state.charts.absolute = Highcharts.chart("absoluteChart", {
           chart: {
             type: "bar",
@@ -1201,6 +1340,7 @@
 
       function init() {
         try {
+          // Load the TSV payload embedded in the HTML (script#taxaData) and build the data rows.
           const text = document.getElementById("taxaData").textContent;
           state.rows = parseTSV(text);
           state.ranks = uniqueRanks(state.rows);
@@ -1215,6 +1355,8 @@
           });
 
           state.metaColumns = getMetaColumns(state.rows);
+          state.metaColumns = state.metaColumns.filter((column) => column !== "All");
+          state.metaColumns.unshift("All");
           const groupSelect = document.getElementById("groupSelect");
           groupSelect.innerHTML = "";
           ["None", ...state.metaColumns].forEach((column) => {
@@ -1259,9 +1401,6 @@
             updateMainRefreshState();
           });
 
-          if (!state.metaColumns.includes("All")) {
-            state.metaColumns.unshift("All");
-          }
           const conditionSelect = document.getElementById("conditionSelect");
           conditionSelect.innerHTML = "";
           state.metaColumns.forEach((column) => {
@@ -1271,6 +1410,11 @@
             conditionSelect.appendChild(option);
           });
           const refreshPanelButton = document.getElementById("taxonRefreshPanel");
+          const setLoading = (id, isLoading) => {
+            const overlay = document.getElementById(id);
+            if (!overlay) return;
+            overlay.hidden = !isLoading;
+          };
           const updateTaxonRefreshState = () => {
             refreshPanelButton.disabled = !state.taxonDirty;
           };
@@ -1310,18 +1454,28 @@
             updateMainRefreshState();
           });
 
+          if (!state.mainPending) {
+            state.mainPending = {
+              rank: state.ranks[0] || null,
+              groupBy: state.groupBy,
+              taxonOrder: state.taxonOrder,
+              pinnedTaxon: state.pinnedTaxon,
+              topN: state.topN,
+              showAllSamples: state.showAllSamples,
+            };
+          }
           const sampleToggle = document.getElementById("sampleToggle");
           const updateSampleToggle = () => {
-            sampleToggle.textContent = state.mainPending.showAllSamples
+            sampleToggle.textContent = state.showAllSamples
               ? "Collapse"
               : "Show all";
           };
           updateSampleToggle();
           sampleToggle.addEventListener("click", () => {
-            state.mainPending.showAllSamples = !state.mainPending.showAllSamples;
+            state.showAllSamples = !state.showAllSamples;
+            state.mainPending.showAllSamples = state.showAllSamples;
             updateSampleToggle();
-            state.mainDirty = true;
-            updateMainRefreshState();
+            renderCharts(state.activeRank || state.mainPending.rank, state.groupBy, state.taxonOrder);
           });
 
           const defaultRank = state.ranks.includes("Genus")
@@ -1393,11 +1547,19 @@
             state.taxonDirty = false;
             updateTaxonRefreshState();
             const scrollY = window.scrollY;
-            renderTaxonPanel(rankSelect.value);
-            requestAnimationFrame(() => window.scrollTo(0, scrollY));
+            setLoading("taxonPanelLoading", true);
+            requestAnimationFrame(() => {
+              try {
+                renderTaxonPanel(rankSelect.value);
+              } finally {
+                setLoading("taxonPanelLoading", false);
+                window.scrollTo(0, scrollY);
+              }
+            });
           };
           refreshPanelButton.addEventListener("click", applyTaxonRefresh);
           updateTaxonRefreshState();
+          setLoading("taxonPanelLoading", false);
 
           state.mainPending = {
             rank: defaultRank,
@@ -1418,12 +1580,20 @@
             updateMainRefreshState();
             updatePinOptions(state.mainPending.rank, state.groupBy, state.taxonOrder);
             taxonPinSelect.value = state.pinnedTaxon || "None";
-            renderCharts(state.mainPending.rank, state.groupBy, state.taxonOrder);
+            setLoading("mainChartsLoading", true);
+            requestAnimationFrame(() => {
+              try {
+                renderCharts(state.mainPending.rank, state.groupBy, state.taxonOrder);
+              } finally {
+                setLoading("mainChartsLoading", false);
+              }
+            });
             state.taxonDirty = true;
             updateTaxonRefreshState();
           });
           renderCharts(defaultRank, state.groupBy, state.taxonOrder);
           renderTaxonPanel(defaultRank);
+          setLoading("mainChartsLoading", false);
           document.getElementById("status").textContent =
             "Loaded " + state.rows.length + " rows.";
         } catch (err) {
