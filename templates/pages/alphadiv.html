@@ -1,0 +1,99 @@
+<section class="page" id="page-alphadiv" hidden>
+  <header class="page-header">
+    <div class="header-bar">
+      <img
+        src="assets/logo_horizonal_export_white.svg"
+        alt="Phylochart logo"
+        class="logo"
+      />
+    </div>
+    <div class="header-text">
+      <h1>Alpha diversity overview</h1>
+      <p class="subtitle">
+        Sample-level diversity metrics stratified by taxonomy rank.
+      </p>
+    </div>
+  </header>
+  <div class="charts">
+    <div class="chart-card full-width loading-container" id="alphaPanelCard">
+      <div class="chart-title" id="alphaPanelTitle">Alpha diversity by condition</div>
+      <div class="panel-controls">
+        <label for="alphaRankSelect">Rank</label>
+        <select id="alphaRankSelect"></select>
+        <label for="alphaTypeSelect">Metric</label>
+        <select id="alphaTypeSelect"></select>
+        <label for="alphaConditionSelect">x-Axis</label>
+        <select id="alphaConditionSelect"></select>
+        <label for="alphaColorConditionSelect">Facet by</label>
+        <select id="alphaColorConditionSelect"></select>
+        <span class="refresh-control">
+          <button id="alphaRefreshPanel" class="refresh-button" type="button">Refresh</button>
+          <label class="auto-refresh">
+            <input id="alphaAutoRefresh" type="checkbox" />
+            Auto
+          </label>
+        </span>
+      </div>
+      <div id="alphaChartPanel"></div>
+      <div class="loading-overlay" id="alphaPanelLoading" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        Loading alpha diversity...
+      </div>
+    </div>
+  </div>
+  <div class="charts">
+    <div class="chart-card full-width table-panel" id="alphaSummaryPanel">
+      <div class="table-panel-header">
+        <div class="chart-title">Alpha diversity summary</div>
+        <button
+          class="refresh-button table-panel-toggle"
+          type="button"
+          data-table-toggle="alphaSummaryPanel"
+          aria-expanded="true"
+        >
+          Hide table
+        </button>
+      </div>
+      <div class="table-panel-body" id="alphaSummaryBody">
+        <div id="alphaSummaryTable" class="summary-table"></div>
+      </div>
+    </div>
+  </div>
+  <div class="charts">
+    <div class="chart-card full-width table-panel" id="alphaStatsPanel">
+      <div class="table-panel-header">
+        <div class="chart-title">Alpha diversity stats (x-Axis)</div>
+        <button
+          class="refresh-button table-panel-toggle"
+          type="button"
+          data-table-toggle="alphaStatsPanel"
+          aria-expanded="true"
+        >
+          Hide table
+        </button>
+      </div>
+      <div class="table-panel-body" id="alphaStatsBody">
+        <div id="alphaStatsTable" class="summary-table"></div>
+      </div>
+    </div>
+  </div>
+  <div class="charts">
+    <div class="chart-card full-width table-panel" id="alphaSignificantPanel">
+      <div class="table-panel-header">
+        <div class="chart-title">Significant comparisons</div>
+        <button
+          class="refresh-button table-panel-toggle"
+          type="button"
+          data-table-toggle="alphaSignificantPanel"
+          aria-expanded="true"
+        >
+          Hide table
+        </button>
+      </div>
+      <div class="table-panel-body" id="alphaSignificantBody">
+        <div id="alphaSignificantTable" class="summary-table"></div>
+      </div>
+    </div>
+  </div>
+  <div id="alphaStatus">Waiting for alpha diversity data...</div>
+</section>

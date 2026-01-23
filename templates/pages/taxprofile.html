@@ -1,0 +1,137 @@
+<section class="page" id="page-taxprofile">
+        <header class="page-header">
+          <div class="header-bar">
+            <img
+              src="assets/logo_horizonal_export_white.svg"
+              alt="Phylochart logo"
+              class="logo"
+            />
+          </div>
+          <div class="header-text">
+            <h1>Taxonomic profiling</h1>
+            <p class="subtitle">
+              Stacked bar view of taxa abundance with rank filtering.
+            </p>
+          </div>
+        </header>
+      <div class="controls">
+        <label for="rankSelect">Rank</label>
+        <select id="rankSelect"></select>
+        <label for="groupSelect">Group by</label>
+        <select id="groupSelect"></select>
+        <label for="taxonPinDropdown">Pin taxon</label>
+        <div class="search-dropdown" id="taxonPinDropdown">
+          <button class="search-dropdown-toggle" type="button">
+            <span class="search-dropdown-value" data-placeholder="Select taxon">
+              Select taxon
+            </span>
+            <span class="search-dropdown-caret">▾</span>
+          </button>
+          <div class="search-dropdown-menu" hidden>
+            <input
+              class="search-dropdown-input"
+              type="search"
+              placeholder="Filter taxa..."
+              aria-label="Filter taxa"
+            />
+            <div class="search-dropdown-list"></div>
+          </div>
+        </div>
+        <label for="topNInput">Top N</label>
+        <input id="topNInput" type="number" min="1" step="1" value="15" />
+        <span class="refresh-control">
+          <button id="taxonRefresh" class="refresh-button" type="button">Refresh</button>
+          <label class="auto-refresh">
+            <input id="taxonAutoRefresh" type="checkbox" />
+            Auto
+          </label>
+        </span>
+      </div>
+
+      <div class="charts loading-container" id="mainCharts">
+        <div class="chart-card">
+          <div class="chart-title">Relative abundance</div>
+          <div id="relativeChart"></div>
+        </div>
+        <div class="chart-card" id="absoluteCard">
+          <div class="chart-title">Absolute abundance</div>
+          <div id="absoluteChart"></div>
+        </div>
+        <div class="loading-overlay" id="mainChartsLoading" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          Loading taxon profiles...
+        </div>
+      </div>
+      <div class="sample-toggle-wrapper">
+        <button id="sampleToggle" class="refresh-button" type="button">Show all</button>
+      </div>
+      <div class="charts">
+        <div class="chart-card full-width loading-container" id="taxonPanelCard">
+          <div class="chart-title" id="taxonPanelTitle">Selected taxon by condition</div>
+          <div class="panel-controls">
+            <label for="conditionSelect">x-Axis</label>
+            <select id="conditionSelect"></select>
+            <label for="abundanceTypeSelect">Abundance</label>
+            <select id="abundanceTypeSelect"></select>
+            <label for="taxonScaleSelect">Scale</label>
+            <select id="taxonScaleSelect"></select>
+            <label class="auto-refresh">
+              <input id="taxonIncludeZeros" type="checkbox" />
+              Include 0s
+            </label>
+            <label for="colorConditionSelect">Facet by</label>
+            <select id="colorConditionSelect"></select>
+            <label for="taxonPanelPinDropdown">Pin taxon</label>
+            <div class="search-dropdown" id="taxonPanelPinDropdown">
+              <button class="search-dropdown-toggle" type="button">
+                <span class="search-dropdown-value" data-placeholder="Select taxon">
+                  Select taxon
+                </span>
+                <span class="search-dropdown-caret">▾</span>
+              </button>
+              <div class="search-dropdown-menu" hidden>
+                <input
+                  class="search-dropdown-input"
+                  type="search"
+                  placeholder="Filter taxa..."
+                  aria-label="Filter taxa"
+                />
+                <div class="search-dropdown-list"></div>
+              </div>
+            </div>
+            <span class="refresh-control">
+              <button id="taxonRefreshPanel" class="refresh-button" type="button">Refresh</button>
+              <label class="auto-refresh">
+                <input id="taxonPanelAutoRefresh" type="checkbox" />
+                Auto
+              </label>
+            </span>
+          </div>
+          <div id="taxonChartPanel"></div>
+          <div class="loading-overlay" id="taxonPanelLoading" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            Loading selected taxon...
+          </div>
+        </div>
+      </div>
+      <div class="charts">
+        <div class="chart-card full-width table-panel" id="taxonSummaryPanel">
+          <div class="table-panel-header">
+            <div class="chart-title">Taxon abundance summary</div>
+            <button
+              class="refresh-button table-panel-toggle"
+              type="button"
+              data-table-toggle="taxonSummaryPanel"
+              aria-expanded="true"
+            >
+              Hide table
+            </button>
+          </div>
+          <div class="table-panel-body" id="taxonSummaryBody">
+            <div id="taxonSummaryTable" class="summary-table"></div>
+          </div>
+        </div>
+      </div>
+
+        <div id="status">Loading embedded taxa data...</div>
+      </section>
