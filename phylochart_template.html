@@ -10,8 +10,14 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"
+    />
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <style>
       :root {
         color-scheme: light;
@@ -39,6 +45,10 @@
           ),
           radial-gradient(circle at 80% 0%, rgba(191, 111, 16, 0.12), transparent 55%),
           var(--paper);
+      }
+
+      main {
+        padding-bottom: 50vh;
       }
 
       .page {
@@ -85,6 +95,158 @@
         height: 28px;
       }
 
+      .filter-toggle {
+        position: fixed;
+        left: 24px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(26, 26, 26, 0.12);
+        box-shadow: 0 16px 30px rgba(15, 22, 26, 0.18);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        z-index: 35;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .filter-toggle:hover {
+        transform: translateY(-50%) translateY(-2px);
+        box-shadow: 0 16px 30px rgba(15, 22, 26, 0.18);
+      }
+
+      .filter-toggle svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      .filter-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 60;
+      }
+
+      .filter-overlay[hidden] {
+        display: none;
+      }
+
+      .filter-panel {
+        width: min(920px, 96vw);
+        max-height: 90vh;
+        background: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 24px 60px rgba(15, 22, 26, 0.2);
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
+      }
+
+      .filter-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid rgba(26, 26, 26, 0.12);
+      }
+
+      .filter-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .filter-close {
+        border: none;
+        background: transparent;
+        font-size: 1.4rem;
+        cursor: pointer;
+        line-height: 1;
+      }
+
+      .filter-body {
+        padding: 16px 20px 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .filter-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .filter-label {
+        font-weight: 600;
+        min-width: 180px;
+      }
+
+      .filter-dropdown {
+        position: relative;
+        min-width: 260px;
+      }
+
+      .filter-dropdown-toggle {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(26, 26, 26, 0.18);
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        cursor: pointer;
+      }
+
+      .filter-dropdown-menu {
+        position: fixed;
+        width: 280px;
+        max-height: 320px;
+        overflow-y: auto;
+        background: #ffffff;
+        border: 1px solid rgba(26, 26, 26, 0.18);
+        border-radius: 12px;
+        box-shadow: 0 16px 28px rgba(15, 22, 26, 0.18);
+        padding: 8px;
+        z-index: 70;
+      }
+
+      .filter-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 6px;
+        font-size: 0.92rem;
+      }
+
+      .filter-dropdown-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(26, 26, 26, 0.12);
+      }
+
+      .filter-action-button {
+        flex: 1;
+        border: 1px solid rgba(26, 26, 26, 0.18);
+        background: #f6f6f6;
+        border-radius: 8px;
+        padding: 6px 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+
       @media (max-width: 960px) {
         .side-nav {
           position: static;
@@ -93,6 +255,10 @@
           justify-content: flex-end;
           margin: 0 0 16px;
         }
+
+        .filter-toggle {
+          left: 12px;
+        }
       }
 
       header {
@@ -100,6 +266,28 @@
         flex-direction: column;
         align-items: flex-start;
         gap: 16px;
+      }
+
+      header.page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .header-bar {
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-top: -40px;
+        background: #2b2b2b;
+        padding: 12px 32px;
+        box-sizing: border-box;
+      }
+
+      .header-text {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 28px;
       }
 
       .logo {
@@ -117,6 +305,51 @@
         color: var(--muted);
         margin: 0;
         font-size: 0.98rem;
+      }
+
+      .summary-table {
+        margin-top: 18px;
+        overflow-x: auto;
+      }
+
+      .alpha-summary-table,
+      .taxon-summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+      }
+
+      .alpha-summary-table th,
+      .alpha-summary-table td,
+      .taxon-summary-table th,
+      .taxon-summary-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(26, 26, 26, 0.12);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .alpha-summary-table thead th,
+      .taxon-summary-table thead th {
+        background: rgba(0, 0, 0, 0.04);
+        font-weight: 600;
+      }
+
+      .alpha-summary-table tbody tr:nth-child(even),
+      .taxon-summary-table tbody tr:nth-child(even) {
+        background: rgba(0, 0, 0, 0.02);
+      }
+
+      select:disabled {
+        background-color: #e2e2e2;
+        color: #7a7a7a;
+        border-color: rgba(26, 26, 26, 0.15);
+      }
+
+      @media (max-width: 720px) {
+        header.page-header {
+          align-items: flex-start;
+        }
       }
 
       .controls {
@@ -152,7 +385,8 @@
         min-width: 140px;
       }
 
-      input[type="number"] {
+      input[type="number"],
+      input[type="search"] {
         font-family: inherit;
         font-weight: 600;
         padding: 6px 12px;
@@ -160,6 +394,9 @@
         border: 1px solid rgba(26, 26, 26, 0.15);
         background: #fff;
         color: var(--ink);
+      }
+
+      input[type="number"] {
         width: 90px;
       }
 
@@ -172,6 +409,168 @@
         background: #fff;
         color: var(--ink);
         cursor: pointer;
+      }
+
+      .refresh-button {
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+      }
+
+      .refresh-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(15, 22, 26, 0.12);
+        border-color: rgba(27, 94, 69, 0.4);
+      }
+
+      .refresh-button:active {
+        transform: translateY(1px);
+        box-shadow: inset 0 4px 10px rgba(15, 22, 26, 0.12);
+      }
+
+      .auto-refresh {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: var(--muted);
+        padding: 6px 12px;
+      }
+
+      .zero-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .zero-toggle input {
+        accent-color: var(--accent);
+      }
+
+      .auto-refresh input {
+        accent-color: var(--accent);
+      }
+
+      .refresh-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 0;
+        white-space: nowrap;
+        border-radius: 999px;
+        border: 1px solid rgba(26, 26, 26, 0.15);
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 10px 24px rgba(15, 22, 26, 0.08);
+        overflow: hidden;
+      }
+
+      .refresh-control .refresh-button {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        padding: 6px 14px;
+        border-radius: 999px 0 0 999px;
+      }
+
+      .refresh-control .auto-refresh {
+        border-left: 1px solid rgba(26, 26, 26, 0.15);
+      }
+
+      .refresh-control:hover .refresh-button {
+        transform: translateY(1px);
+        box-shadow: inset 0 2px 6px rgba(15, 22, 26, 0.08);
+      }
+
+      .refresh-control:active .refresh-button {
+        transform: translateY(2px);
+        box-shadow: inset 0 4px 10px rgba(15, 22, 26, 0.12);
+      }
+
+      .search-dropdown {
+        position: relative;
+        min-width: 220px;
+      }
+
+      .search-dropdown-toggle {
+        font-family: inherit;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(26, 26, 26, 0.15);
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .search-dropdown-toggle:focus-visible {
+        outline: 2px solid rgba(27, 94, 69, 0.4);
+        outline-offset: 2px;
+      }
+
+      .search-dropdown-value {
+        flex: 1;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .search-dropdown-value:empty::before {
+        content: attr(data-placeholder);
+        color: var(--muted);
+      }
+
+      .search-dropdown-caret {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .search-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid rgba(26, 26, 26, 0.12);
+        box-shadow: 0 12px 24px rgba(15, 22, 26, 0.18);
+        padding: 10px;
+        z-index: 20;
+      }
+
+      .search-dropdown-menu[hidden] {
+        display: none;
+      }
+
+      .search-dropdown-input {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
+      .search-dropdown-list {
+        max-height: 220px;
+        overflow-y: auto;
+        display: grid;
+        gap: 4px;
+      }
+
+      .search-dropdown-item {
+        padding: 6px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+
+      .search-dropdown-item:hover {
+        background: rgba(27, 94, 69, 0.08);
+      }
+
+      .search-dropdown-item.is-selected {
+        background: rgba(27, 94, 69, 0.16);
+        font-weight: 600;
       }
 
       .charts {
@@ -234,6 +633,29 @@
 
       .chart-card.full-width {
         grid-column: 1 / -1;
+        width: 100%;
+        justify-self: stretch;
+      }
+
+      .table-panel {
+        padding: 10px 12px 12px;
+      }
+
+      .table-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .table-panel-body[hidden] {
+        display: none;
+      }
+
+      .summary-table.scrollable {
+        max-height: 320px;
+        overflow-y: auto;
       }
 
       .chart-title {
@@ -252,6 +674,15 @@
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       }
 
+      #alphaChartPanel {
+        display: grid;
+        gap: 12px;
+      }
+
+      #alphaChartPanel.facets {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
       .panel-controls {
         display: flex;
         align-items: center;
@@ -265,6 +696,18 @@
         padding: 8px 10px;
         border-radius: 12px;
         box-shadow: 0 8px 20px rgba(15, 22, 26, 0.08);
+      }
+
+      .panel-controls .refresh-control {
+        flex: 0 0 auto;
+        align-self: center;
+        justify-content: center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .panel-controls .search-dropdown {
+        margin-left: auto;
       }
 
       .sample-toggle-wrapper {
@@ -301,82 +744,43 @@
       <a href="#" data-target="page-alphadiv" aria-label="Alpha diversity">
         <img src="assets/alphadiv.svg" alt="" aria-hidden="true" />
       </a>
+      <a href="#" data-target="page-betadiv" aria-label="Beta diversity">
+        <img src="assets/betadiv.svg" alt="" aria-hidden="true" />
+      </a>
+      <a href="#" data-target="page-pcoa" aria-label="PCoA">
+        <img src="assets/pcoa.svg" alt="" aria-hidden="true" />
+      </a>
     </nav>
 
+    <button class="filter-toggle" id="filterToggle" type="button" aria-label="Filter data">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          d="M4 5h16l-6.2 7.2v5.3l-3.6 1.5v-6.8L4 5z"
+          fill="currentColor"
+        />
+      </svg>
+    </button>
+
+    <div class="filter-overlay" id="filterOverlay" hidden>
+      <div class="filter-panel" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
+        <div class="filter-header">
+          <h3 id="filterTitle">Filter samples</h3>
+          <button class="filter-close" id="filterClose" type="button" aria-label="Close filters">
+            &times;
+          </button>
+        </div>
+        <div class="filter-body" id="filterRows"></div>
+      </div>
+    </div>
+
     <main>
-      <section class="page" id="page-taxprofile">
-        <header>
-        <div>
-          <img
-            src="assets/logo_horizonal_export_white.svg"
-            alt="Taxon profiles by sample"
-            class="logo"
-          />
-          <p class="subtitle">
-            Stacked bar view of taxa abundance with rank filtering.
-          </p>
-        </div>
-        </header>
-      <div class="controls">
-        <label for="rankSelect">Rank</label>
-        <select id="rankSelect"></select>
-        <label for="groupSelect">Group by</label>
-        <select id="groupSelect"></select>
-        <label for="taxonOrderSelect">Taxon order</label>
-        <select id="taxonOrderSelect"></select>
-        <label for="taxonPinSelect">Pin taxon</label>
-        <select id="taxonPinSelect"></select>
-        <label for="topNInput">Top N</label>
-        <input id="topNInput" type="number" min="1" step="1" value="15" />
-        <button id="taxonRefresh" type="button">Refresh</button>
-      </div>
-
-      <div class="charts loading-container" id="mainCharts">
-        <div class="chart-card">
-          <div class="chart-title">Relative abundance</div>
-          <div id="relativeChart"></div>
-        </div>
-        <div class="chart-card" id="absoluteCard">
-          <div class="chart-title">Absolute abundance</div>
-          <div id="absoluteChart"></div>
-        </div>
-        <div class="loading-overlay" id="mainChartsLoading" hidden>
-          <span class="spinner" aria-hidden="true"></span>
-          Loading taxon profiles...
-        </div>
-      </div>
-      <div class="sample-toggle-wrapper">
-        <button id="sampleToggle" type="button">Show all</button>
-      </div>
-      <div class="charts">
-        <div class="chart-card full-width loading-container" id="taxonPanelCard">
-          <div class="chart-title" id="taxonPanelTitle">Selected taxon by condition</div>
-          <div class="panel-controls">
-            <label for="conditionSelect">x-Axis</label>
-            <select id="conditionSelect"></select>
-            <label for="abundanceTypeSelect">Abundance</label>
-            <select id="abundanceTypeSelect"></select>
-            <label for="taxonScaleSelect">Scale</label>
-            <select id="taxonScaleSelect"></select>
-            <label for="colorConditionSelect">Facet by</label>
-            <select id="colorConditionSelect"></select>
-            <button id="taxonRefreshPanel" type="button">Refresh</button>
-          </div>
-          <div id="taxonChartPanel"></div>
-          <div class="loading-overlay" id="taxonPanelLoading" hidden>
-            <span class="spinner" aria-hidden="true"></span>
-            Loading selected taxon...
-          </div>
-        </div>
-      </div>
-
-        <div id="status">Loading embedded taxa data...</div>
-      </section>
-
-      <section class="page" id="page-alphadiv" hidden>
-      </section>
+      <!-- PAGE_SECTIONS -->
     </main>
     <!-- TAXA_DATA -->
+    <!-- ALPHA_DATA -->
+    <!-- ALPHA_STATS -->
+    <!-- BETA_DATA -->
+    <!-- BETA_STATS -->
 
     <script>
       const TOP_N = 15;
@@ -403,6 +807,8 @@
         "#2c6f62",
         "#3f3f3f",
       ];
+      const OTHER_COLOR = "#3b3b3b";
+      const PINNED_COLOR = "#c9c9c9";
 
       const state = {
         rows: [],
@@ -411,11 +817,13 @@
         groupBy: "None",
         taxonOrder: "total_desc",
         pinnedTaxon: null,
+        availableTaxa: [],
         legendMarginBottom: CHART_MARGIN_BOTTOM,
         taxonCondition: "All",
         taxonAbundanceType: "RelativeAbundance",
         taxonScale: "linear",
         taxonColorCondition: "All",
+        taxonIncludeZeros: true,
         topN: 15,
         sampleLimit: 10,
         showAllSamples: false,
@@ -424,28 +832,120 @@
         mainDirty: false,
         taxonPending: null,
         taxonDirty: false,
+        taxonAutoRefresh: false,
+        mainAutoRefresh: false,
+        mainRefreshButton: null,
+        taxonRefreshButton: null,
+        taxonDropdown: null,
+        taxonPanelDropdown: null,
+        sampleMetaMap: new Map(),
         charts: {},
       };
 
-      // Parse embedded TSV into row objects and ensure an "All" column exists.
+      const alphaState = {
+        rows: [],
+        ranks: [],
+        types: [],
+        metaColumns: [],
+        rank: null,
+        type: null,
+        condition: "All",
+        colorCondition: "All",
+        pending: null,
+        dirty: false,
+        autoRefresh: false,
+      };
+
+      const alphaStats = {
+        rows: [],
+      };
+
+      const betaState = {
+        rows: [],
+        metrics: [],
+        metaColumns: [],
+        metric: null,
+        condition: "All",
+        pending: null,
+        dirty: false,
+        autoRefresh: false,
+      };
+
+      const betaStats = {
+        rows: [],
+      };
+
+      const filterState = {
+        selections: new Map(),
+        values: new Map(),
+      };
+
+      let alphaSignificantDataTable = null;
+
+      const MISSING_LABEL = "(Missing)";
+
+      // Parse TSV text into a list of row objects.
       function parseTSV(text) {
-        const lines = text.trim().split(/\r?\n/);
+        const trimmed = text.trim();
+        if (!trimmed) return [];
+        const lines = trimmed.split(/\r?\n/);
         const header = lines[0].split("\t");
-        const hasAll = header.includes("All");
-        const fullHeader = hasAll ? header : [...header, "All"];
-        return lines.slice(1).map((line) => {
+        return lines.slice(1).filter(Boolean).map((line) => {
           const cols = line.split("\t");
           const row = {};
-          fullHeader.forEach((key, idx) => {
-            if (key === "All") {
-              row[key] = "All";
-              return;
-            }
-            row[key] = cols[idx];
+          header.forEach((key, idx) => {
+            row[key] = cols[idx] ?? "";
           });
-          row.Abundance = Number(row.Abundance || 0);
           return row;
         });
+      }
+
+      function ensureAllColumn(rows) {
+        if (!rows.length) return rows;
+        if ("All" in rows[0]) return rows;
+        rows.forEach((row) => {
+          row.All = "All";
+        });
+        return rows;
+      }
+
+      function mergeWithMeta(rows, metaRows) {
+        if (!metaRows || !metaRows.length) return rows;
+        const metaMap = new Map(metaRows.map((row) => [row.Sample, row]));
+        return rows.map((row) => {
+          const meta = metaMap.get(row.Sample);
+          if (!meta) return row;
+          const merged = { ...row };
+          Object.keys(meta).forEach((key) => {
+            if (key === "Sample") return;
+            merged[key] = meta[key];
+          });
+          return merged;
+        });
+      }
+
+      function parseTaxaRows(text, metaRows) {
+        const rows = parseTSV(text);
+        rows.forEach((row) => {
+          row.Abundance = Number(row.Abundance || 0);
+        });
+        return ensureAllColumn(mergeWithMeta(rows, metaRows));
+      }
+
+      function parseAlphaRows(text, metaRows) {
+        const rows = parseTSV(text);
+        rows.forEach((row) => {
+          row.Value = Number(row.Value);
+        });
+        return ensureAllColumn(mergeWithMeta(rows, metaRows));
+      }
+
+      function parseBetaRows(text) {
+        const rows = parseTSV(text);
+        rows.forEach((row) => {
+          row.Distance = Number(row.Distance);
+        });
+        return rows;
       }
 
       function sampleLabel(row) {
@@ -460,8 +960,61 @@
           "Abundance",
           "Type",
           "Sample",
+          "Value",
         ]);
         return Object.keys(rows[0]).filter((key) => !excluded.has(key));
+      }
+
+      function normalizeMetaValue(value) {
+        if (value === null || value === undefined || value === "") {
+          return MISSING_LABEL;
+        }
+        return value;
+      }
+
+      function buildFilterValues(rows, columns) {
+        const valuesMap = new Map();
+        columns.forEach((column) => valuesMap.set(column, new Set()));
+        rows.forEach((row) => {
+          columns.forEach((column) => {
+            const value = normalizeMetaValue(row[column]);
+            valuesMap.get(column).add(value);
+          });
+        });
+        return valuesMap;
+      }
+
+      function rowPassesFilters(row) {
+        if (!filterState.selections.size) return true;
+        for (const [column, selected] of filterState.selections.entries()) {
+          if (!selected || !selected.size) return false;
+          const value = normalizeMetaValue(row[column]);
+          if (!selected.has(value)) return false;
+        }
+        return true;
+      }
+
+      function betaRowPassesFilters(row) {
+        if (!filterState.selections.size) return true;
+        for (const [column, selected] of filterState.selections.entries()) {
+          if (!selected || !selected.size) return false;
+          const meta1 = state.sampleMetaMap.get(row.Sample1) || {};
+          const meta2 = state.sampleMetaMap.get(row.Sample2) || {};
+          const value1 = normalizeMetaValue(meta1[column]);
+          const value2 = normalizeMetaValue(meta2[column]);
+          if (!selected.has(value1) || !selected.has(value2)) return false;
+        }
+        return true;
+      }
+
+      function getFilteredTaxaRows() {
+        if (!filterState.selections.size) return state.rows;
+        return state.rows.filter((row) => rowPassesFilters(row));
+      }
+
+      function getFilteredAlphaRows() {
+        if (!filterState.selections.size) return alphaState.rows;
+        return alphaState.rows.filter((row) => rowPassesFilters(row));
       }
 
       function isGroupLabel(value) {
@@ -528,6 +1081,381 @@
         return ranks;
       }
 
+      function uniqueTypes(rows) {
+        const seen = new Set();
+        const types = [];
+        rows.forEach((row) => {
+          if (!seen.has(row.Type)) {
+            seen.add(row.Type);
+            types.push(row.Type);
+          }
+        });
+        return types;
+      }
+
+      function createSearchDropdown(root, onSelect) {
+        if (!root) return null;
+        const toggle = root.querySelector(".search-dropdown-toggle");
+        const menu = root.querySelector(".search-dropdown-menu");
+        const input = root.querySelector(".search-dropdown-input");
+        const list = root.querySelector(".search-dropdown-list");
+        const valueNode = root.querySelector(".search-dropdown-value");
+        let options = [];
+        let currentValue = "";
+
+        const renderOptions = (filterText = "") => {
+          list.innerHTML = "";
+          const term = filterText.toLowerCase();
+          options
+            .filter((option) => option.label.toLowerCase().includes(term))
+            .forEach((option) => {
+              const item = document.createElement("div");
+              item.className = "search-dropdown-item";
+              if (option.value === currentValue) {
+                item.classList.add("is-selected");
+              }
+              item.textContent = option.label;
+              item.addEventListener("click", () => {
+                setValue(option.value);
+                closeMenu();
+                onSelect(option.value);
+              });
+              list.appendChild(item);
+            });
+        };
+
+        const openMenu = () => {
+          menu.hidden = false;
+          input.value = "";
+          renderOptions("");
+          input.focus();
+        };
+
+        const closeMenu = () => {
+          menu.hidden = true;
+        };
+
+        const setOptions = (values, includeNone = true) => {
+          options = [];
+          if (includeNone) {
+            options.push({ value: "", label: "None" });
+          }
+          values.forEach((value) => {
+            options.push({ value, label: value });
+          });
+          renderOptions(input.value || "");
+        };
+
+        const setValue = (value) => {
+          currentValue = value || "";
+          if (valueNode) {
+            valueNode.textContent = currentValue || "";
+          }
+        };
+
+        toggle.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (menu.hidden) {
+            openMenu();
+          } else {
+            closeMenu();
+          }
+        });
+
+        input.addEventListener("input", () => {
+          renderOptions(input.value);
+        });
+
+        document.addEventListener("click", (event) => {
+          if (!root.contains(event.target)) {
+            closeMenu();
+          }
+        });
+
+        return {
+          setOptions,
+          setValue,
+          getValue: () => currentValue,
+          closeMenu,
+        };
+      }
+
+      function updateMainRefreshState() {
+        if (!state.mainRefreshButton) return;
+        state.mainRefreshButton.disabled = !state.mainDirty;
+      }
+
+      function updateTaxonRefreshState() {
+        if (!state.taxonRefreshButton) return;
+        state.taxonRefreshButton.disabled = !state.taxonDirty;
+      }
+
+      function closeFilterMenus() {
+        document.querySelectorAll(".filter-dropdown-menu").forEach((menu) => {
+          menu.hidden = true;
+        });
+      }
+
+      function updateFilterDropdownLabel(toggle, column) {
+        const selected = filterState.selections.get(column);
+        const total = filterState.values.get(column)?.size || 0;
+        const label = !total
+          ? "None"
+          : selected && selected.size === total
+            ? "All"
+            : `${selected ? selected.size : 0} selected`;
+        const labelNode = toggle.querySelector(".filter-dropdown-value");
+        if (labelNode) {
+          labelNode.textContent = label;
+        }
+      }
+
+      function renderFilterRows(columns) {
+        const container = document.getElementById("filterRows");
+        if (!container) return;
+        container.innerHTML = "";
+        columns.forEach((column) => {
+          const row = document.createElement("div");
+          row.className = "filter-row";
+
+          const label = document.createElement("div");
+          label.className = "filter-label";
+          label.textContent = column;
+
+          const dropdown = document.createElement("div");
+          dropdown.className = "filter-dropdown";
+
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = "filter-dropdown-toggle";
+          toggle.innerHTML = `
+            <span class="filter-dropdown-value">All</span>
+            <span class="filter-dropdown-caret">▾</span>
+          `;
+
+          const menu = document.createElement("div");
+          menu.className = "filter-dropdown-menu";
+          menu.hidden = true;
+
+          const values = Array.from(filterState.values.get(column) || []).sort((a, b) =>
+            String(a).localeCompare(String(b))
+          );
+          const selected = filterState.selections.get(column) || new Set();
+          const checkboxNodes = [];
+          values.forEach((value) => {
+            const option = document.createElement("label");
+            option.className = "filter-option";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = value;
+            checkbox.checked = selected.has(value);
+            checkbox.addEventListener("change", () => {
+              if (checkbox.checked) {
+                selected.add(value);
+              } else {
+                selected.delete(value);
+              }
+              updateFilterDropdownLabel(toggle, column);
+              applyFilters();
+            });
+            const text = document.createElement("span");
+            text.textContent = value;
+            option.appendChild(checkbox);
+            option.appendChild(text);
+            menu.appendChild(option);
+            checkboxNodes.push(checkbox);
+          });
+
+          const actions = document.createElement("div");
+          actions.className = "filter-dropdown-actions";
+          const selectAll = document.createElement("button");
+          selectAll.type = "button";
+          selectAll.className = "filter-action-button";
+          selectAll.textContent = "Select all";
+          selectAll.addEventListener("click", () => {
+            selected.clear();
+            values.forEach((value) => selected.add(value));
+            checkboxNodes.forEach((checkbox) => {
+              checkbox.checked = true;
+            });
+            updateFilterDropdownLabel(toggle, column);
+            applyFilters();
+          });
+          const clearAll = document.createElement("button");
+          clearAll.type = "button";
+          clearAll.className = "filter-action-button";
+          clearAll.textContent = "Unselect all";
+          clearAll.addEventListener("click", () => {
+            selected.clear();
+            checkboxNodes.forEach((checkbox) => {
+              checkbox.checked = false;
+            });
+            updateFilterDropdownLabel(toggle, column);
+            applyFilters();
+          });
+          actions.appendChild(selectAll);
+          actions.appendChild(clearAll);
+          menu.appendChild(actions);
+
+          toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            const isOpen = !menu.hidden;
+            closeFilterMenus();
+            if (!isOpen) {
+              menu.hidden = false;
+              menu.style.position = "fixed";
+              menu.style.zIndex = "80";
+              menu.style.maxHeight = "320px";
+              const rect = toggle.getBoundingClientRect();
+              const menuRect = menu.getBoundingClientRect();
+              const spaceBelow = window.innerHeight - rect.bottom - 16;
+              const spaceAbove = rect.top - 16;
+              let top = rect.bottom + 6;
+              let maxHeight = Math.min(320, spaceBelow);
+              if (spaceBelow < 160 && spaceAbove > spaceBelow) {
+                maxHeight = Math.min(320, spaceAbove);
+                top = rect.top - menuRect.height - 6;
+                if (top < 16) {
+                  top = 16;
+                }
+              }
+              menu.style.maxHeight = `${Math.max(140, maxHeight)}px`;
+              const left = Math.min(
+                rect.right - menuRect.width,
+                window.innerWidth - 16
+              );
+              menu.style.top = `${top}px`;
+              menu.style.left = `${Math.max(16, left)}px`;
+            }
+          });
+          menu.addEventListener("click", (event) => {
+            event.stopPropagation();
+          });
+
+          updateFilterDropdownLabel(toggle, column);
+
+          dropdown.appendChild(toggle);
+          dropdown.appendChild(menu);
+          row.appendChild(label);
+          row.appendChild(dropdown);
+          container.appendChild(row);
+        });
+      }
+
+      function initializeFilters() {
+        const columns = state.metaColumns.filter((column) => column !== "All");
+        if (!columns.length) return;
+        filterState.values = buildFilterValues(state.rows, columns);
+        filterState.selections = new Map();
+        columns.forEach((column) => {
+          filterState.selections.set(
+            column,
+            new Set(filterState.values.get(column) || [])
+          );
+        });
+        renderFilterRows(columns);
+      }
+
+      function applyFilters() {
+        const activeRank =
+          state.activeRank ||
+          (state.mainPending && state.mainPending.rank) ||
+          state.ranks[0];
+        if (!activeRank) return;
+        updatePinOptions(activeRank, state.groupBy, state.taxonOrder);
+        renderCharts(activeRank, state.groupBy, state.taxonOrder);
+        renderTaxonPanel(activeRank);
+        if (alphaState.rows.length) {
+          renderAlphaPanel();
+        }
+        if (betaState.rows.length) {
+          renderBetaPanel();
+        }
+      }
+
+      function setupFilterOverlay() {
+        const toggle = document.getElementById("filterToggle");
+        const overlay = document.getElementById("filterOverlay");
+        const close = document.getElementById("filterClose");
+        if (!toggle || !overlay) return;
+        toggle.addEventListener("click", () => {
+          overlay.hidden = false;
+        });
+        if (close) {
+          close.addEventListener("click", () => {
+            overlay.hidden = true;
+          });
+        }
+        overlay.addEventListener("click", (event) => {
+          if (event.target === overlay) {
+            overlay.hidden = true;
+          }
+        });
+        document.addEventListener("click", (event) => {
+          if (!event.target.closest(".filter-dropdown")) {
+            closeFilterMenus();
+          }
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            overlay.hidden = true;
+            closeFilterMenus();
+          }
+        });
+        window.addEventListener("resize", () => {
+          closeFilterMenus();
+        });
+      }
+
+      function setupTableToggles() {
+        document.querySelectorAll("[data-table-toggle]").forEach((button) => {
+          const targetId = button.getAttribute("data-table-toggle");
+          if (!targetId) return;
+          const panel = document.getElementById(targetId);
+          if (!panel) return;
+          const body = panel.querySelector(".table-panel-body");
+          if (!body) return;
+          button.addEventListener("click", () => {
+            const isHidden = body.hasAttribute("hidden");
+            if (isHidden) {
+              body.removeAttribute("hidden");
+              button.textContent = "Hide table";
+              button.setAttribute("aria-expanded", "true");
+            } else {
+              body.setAttribute("hidden", "");
+              button.textContent = "Show table";
+              button.setAttribute("aria-expanded", "false");
+            }
+          });
+        });
+      }
+
+      function setPinnedTaxon(value, rank, triggerAuto = true) {
+        const trimmed = (value || "").trim();
+        const isValid =
+          !trimmed ||
+          !state.availableTaxa.length ||
+          state.availableTaxa.includes(trimmed);
+        state.pinnedTaxon = isValid && trimmed ? trimmed : null;
+        state.mainPending.pinnedTaxon = state.pinnedTaxon;
+        state.mainDirty = true;
+        updateMainRefreshState();
+        state.taxonDirty = true;
+        updateTaxonRefreshState();
+        if (state.taxonDropdown) {
+          state.taxonDropdown.setValue(state.pinnedTaxon || "");
+        }
+        if (state.taxonPanelDropdown) {
+          state.taxonPanelDropdown.setValue(state.pinnedTaxon || "");
+        }
+        if (triggerAuto && state.mainAutoRefresh && state.mainRefreshButton) {
+          state.mainRefreshButton.click();
+        }
+        if (triggerAuto && state.taxonAutoRefresh && state.taxonRefreshButton) {
+          state.taxonRefreshButton.click();
+        }
+      }
+
       function taxaForRank(rows, rank) {
         const seen = new Set();
         rows.forEach((row) => {
@@ -539,17 +1467,17 @@
         return [...seen].sort((a, b) => a.localeCompare(b));
       }
 
-      function hasTypeForRank(rank, targetType) {
-        return state.rows.some((row) => {
+      function hasTypeForRank(rank, targetType, rows = getFilteredTaxaRows()) {
+        return rows.some((row) => {
           if (row.Rank !== rank) return false;
           const type = row.Type || "RelativeAbundance";
           return type === targetType;
         });
       }
 
-      function resolveBaseType(rank) {
+      function resolveBaseType(rank, rows = getFilteredTaxaRows()) {
         let hasRelative = false;
-        state.rows.forEach((row) => {
+        rows.forEach((row) => {
           if (row.Rank !== rank) return;
           const type = row.Type || "RelativeAbundance";
           if (type === "RelativeAbundance") {
@@ -581,6 +1509,12 @@
         return [min, q1, median, q3, max];
       }
 
+      function computeMean(values) {
+        if (!values.length) return null;
+        const total = values.reduce((sum, value) => sum + value, 0);
+        return total / values.length;
+      }
+
       function stableJitter(seed, amplitude) {
         let hash = 0;
         for (let i = 0; i < seed.length; i += 1) {
@@ -608,7 +1542,15 @@
           .map(([taxon]) => taxon);
       }
 
-      function computeRankData(rank, groupBy, taxonOrder, pinnedTaxon, topN, sampleLimit) {
+      function computeRankData(
+        rank,
+        groupBy,
+        taxonOrder,
+        pinnedTaxon,
+        topN,
+        sampleLimit,
+        rows = getFilteredTaxaRows()
+      ) {
         const samples = [];
         const sampleIndex = new Map();
         const types = ["RelativeAbundance", "AbsoluteAbundance"];
@@ -622,7 +1564,7 @@
         };
         const sampleMeta = new Map();
 
-        state.rows.forEach((row) => {
+        rows.forEach((row) => {
           if (row.Rank !== rank) return;
           const type = row.Type || "RelativeAbundance";
           if (!types.includes(type)) return;
@@ -661,8 +1603,13 @@
           taxaList = [pinnedTaxon, ...taxaList.filter((t) => t !== pinnedTaxon)];
         }
 
+        const colorMap = new Map();
+        sortedTaxa.forEach((taxon, idx) => {
+          colorMap.set(taxon, PALETTE[idx % PALETTE.length]);
+        });
+
         const buildSeries = (type, order, groupFlags) =>
-          taxaList.map((taxon, idx) => {
+          taxaList.map((taxon) => {
             const data = order.map((sample, index) => {
               if (groupFlags[index]) return null;
               const taxonMap = sampleTaxa[type].get(sample) || new Map();
@@ -676,10 +1623,16 @@
               }
               return value;
             });
+            const color =
+              taxon === "Other"
+                ? OTHER_COLOR
+                : pinnedTaxon && taxon === pinnedTaxon
+                  ? PINNED_COLOR
+                  : colorMap.get(taxon) || PALETTE[0];
             return {
               name: taxon,
               data,
-              color: PALETTE[idx % PALETTE.length],
+              color,
             };
           });
 
@@ -740,42 +1693,53 @@
         };
       }
 
-      function updatePinOptions(rank, groupBy, taxonOrder) {
+      function updatePinOptions(rank, groupBy, taxonOrder, topN = state.topN) {
         const data = computeRankData(
           rank,
           groupBy,
           taxonOrder,
           null,
-          state.topN,
+          topN,
           state.sampleLimit
         );
-        const taxonPinSelect = document.getElementById("taxonPinSelect");
-        taxonPinSelect.innerHTML = "";
-        ["None", ...data.taxaList].forEach((taxon) => {
-          const option = document.createElement("option");
-          option.value = taxon;
-          option.textContent = taxon;
-          taxonPinSelect.appendChild(option);
-        });
+        state.availableTaxa = data.taxaList.slice();
+        if (state.taxonDropdown) {
+          state.taxonDropdown.setOptions(state.availableTaxa);
+        }
+        if (state.taxonPanelDropdown) {
+          state.taxonPanelDropdown.setOptions(state.availableTaxa);
+        }
         if (state.pinnedTaxon && !data.taxaList.includes(state.pinnedTaxon)) {
           state.pinnedTaxon = null;
         }
-        taxonPinSelect.value = state.pinnedTaxon || "None";
+        if (state.taxonDropdown) {
+          state.taxonDropdown.setValue(state.pinnedTaxon || "");
+        }
+        if (state.taxonPanelDropdown) {
+          state.taxonPanelDropdown.setValue(state.pinnedTaxon || "");
+        }
       }
 
       function renderTaxonPanel(rank) {
+        const rows = getFilteredTaxaRows();
         const condition = state.taxonCondition;
         const taxon = state.pinnedTaxon;
         const baseType = state.taxonAbundanceType;
         const scaleType = state.taxonScale;
+        const includeZeros = state.taxonIncludeZeros;
         const epsilon = baseType === "RelativeAbundance" ? 1e-6 : 1e-2;
         const colorCondition = state.taxonColorCondition;
+        const jitterAmount = 0.18;
         const panel = document.getElementById("taxonChartPanel");
         const panelTitle = document.getElementById("taxonPanelTitle");
+        const tableContainer = document.getElementById("taxonSummaryTable");
 
         const renderEmpty = (message) => {
           panel.classList.remove("facets");
           panel.innerHTML = '<div id="taxonChart"></div>';
+          if (tableContainer) {
+            tableContainer.innerHTML = "";
+          }
           if (panelTitle) {
             panelTitle.textContent = "Selected taxon by condition";
           }
@@ -804,7 +1768,7 @@
           panelTitle.textContent = `Selected taxon by condition: ${taxon}`;
         }
 
-        if (!hasTypeForRank(rank, baseType)) {
+        if (!hasTypeForRank(rank, baseType, rows)) {
           renderEmpty("No data for the selected abundance type.");
           return;
         }
@@ -812,7 +1776,7 @@
         const sampleMeta = new Map();
         const sampleValues = new Map();
         const sampleSet = new Set();
-        state.rows.forEach((row) => {
+        rows.forEach((row) => {
           if (row.Rank !== rank) return;
           const type = row.Type || "RelativeAbundance";
           if (type !== baseType) return;
@@ -850,6 +1814,7 @@
             colorMap.set(xKey, []);
           }
           const rawValue = sampleValues.get(sample) || 0;
+          if (!includeZeros && rawValue === 0) return;
           const adjustedValue =
             scaleType === "log"
               ? rawValue <= 0
@@ -886,7 +1851,10 @@
           if (scaleType === "log") {
             if (baseType === "RelativeAbundance") {
               const pct = this.value * 100;
-              if (pct < 0.01) return "<0.01%";
+              if (pct < 0.01) {
+                const ticks = this.axis ? this.axis.tickPositions : [];
+                return ticks.length && this.value !== ticks[0] ? "" : "<0.01%";
+              }
               if (pct < 0.1) return pct.toFixed(2) + "%";
               if (pct < 1) return pct.toFixed(1) + "%";
               return pct.toFixed(0) + "%";
@@ -895,6 +1863,17 @@
           }
           if (baseType !== "RelativeAbundance") return this.value;
           return (this.value * 100).toFixed(0) + "%";
+        };
+
+        const buildAxisMin = (stats) => {
+          if (scaleType !== "log") return 0;
+          const dataMin = stats.length
+            ? Math.min(...stats.filter(Boolean).map((row) => row[0]))
+            : null;
+          if (dataMin === null || !Number.isFinite(dataMin)) {
+            return epsilon / 10;
+          }
+          return Math.max(dataMin / 1.5, epsilon / 10);
         };
 
         const buildAxisMax = (stats) => {
@@ -912,8 +1891,84 @@
             : maxValue;
         };
 
+        const renderSummaryTable = (summaryBuckets, facetKeys) => {
+          if (!tableContainer) return;
+          if (!categories.length) {
+            tableContainer.innerHTML = "";
+            return;
+          }
+          const escapeHtml = (value) =>
+            String(value)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#39;");
+          const formatCell = (value) =>
+            Number.isFinite(value) ? Highcharts.numberFormat(value, 4) : "-";
+          const rows = [];
+          facetKeys.forEach((facetKey) => {
+            const bucket = summaryBuckets.get(facetKey) || new Map();
+            categories.forEach((category) => {
+              const values = (bucket.get(category) || []).slice();
+              const filteredValues =
+                scaleType === "log" ? values.filter((v) => v > 0) : values;
+              const stats = computeBoxStats(filteredValues);
+              const mean = computeMean(filteredValues);
+              rows.push({
+                facet: facetKey,
+                category,
+                count: filteredValues.length,
+                min: stats ? stats[0] : null,
+                q1: stats ? stats[1] : null,
+                median: stats ? stats[2] : null,
+                q3: stats ? stats[3] : null,
+                max: stats ? stats[4] : null,
+                mean,
+              });
+            });
+          });
+          tableContainer.innerHTML = `
+            <table class="taxon-summary-table">
+              <thead>
+                <tr>
+                  <th>Facet</th>
+                  <th>${condition === "All" ? "x-Axis" : escapeHtml(condition)}</th>
+                  <th>N</th>
+                  <th>Min</th>
+                  <th>Q1</th>
+                  <th>Median</th>
+                  <th>Q3</th>
+                  <th>Max</th>
+                  <th>Mean</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows
+                  .map(
+                    (row) => `
+                      <tr>
+                        <td>${escapeHtml(row.facet)}</td>
+                        <td>${escapeHtml(row.category)}</td>
+                        <td>${row.count}</td>
+                        <td>${formatCell(row.min)}</td>
+                        <td>${formatCell(row.q1)}</td>
+                        <td>${formatCell(row.median)}</td>
+                        <td>${formatCell(row.q3)}</td>
+                        <td>${formatCell(row.max)}</td>
+                        <td>${formatCell(row.mean)}</td>
+                      </tr>
+                    `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          `;
+        };
+
         if (colorCondition) {
           const facetKeys = colorCondition === "All" ? ["All"] : colorKeys;
+          const summaryBuckets = new Map();
           panel.classList.add("facets");
           panel.innerHTML = facetKeys
             .map((key, idx) => `<div id="taxonFacet-${idx}"></div>`)
@@ -934,7 +1989,15 @@
               if (!pointBuckets.has(xKey)) {
                 pointBuckets.set(xKey, []);
               }
+              if (!summaryBuckets.has(colorKey)) {
+                summaryBuckets.set(colorKey, new Map());
+              }
+              const summaryMap = summaryBuckets.get(colorKey);
+              if (!summaryMap.has(xKey)) {
+                summaryMap.set(xKey, []);
+              }
               const rawValue = sampleValues.get(sample) || 0;
+              if (!includeZeros && rawValue === 0) return;
               const adjustedValue =
                 scaleType === "log"
                   ? rawValue <= 0
@@ -946,6 +2009,7 @@
                 rawValue,
                 adjustedValue,
               });
+              summaryMap.get(xKey).push(rawValue);
             });
 
             const localCategories =
@@ -971,7 +2035,7 @@
               if (xIndex === undefined) return;
               points.forEach((point) => {
                 scatter.push({
-                  x: xIndex + stableJitter(point.sample, 0.18),
+                  x: xIndex,
                   y: point.adjustedValue,
                   name: point.sample,
                   rawValue: point.rawValue,
@@ -992,7 +2056,7 @@
               },
               yAxis: {
                 type: scaleType === "log" ? "logarithmic" : "linear",
-                min: scaleType === "log" ? epsilon / 10 : 0,
+                min: buildAxisMin(stats),
                 max: buildAxisMax(stats),
                 title: { text: null },
                 labels: { formatter: formatAxisLabel },
@@ -1033,6 +2097,8 @@
                   name: key,
                   data: scatter,
                   color: PALETTE[3],
+                  jitter: { x: jitterAmount },
+                  pointPlacement: 0,
                   marker: { radius: 3, lineWidth: 0 },
                   showInLegend: false,
                 },
@@ -1040,12 +2106,14 @@
               credits: { enabled: false },
             });
           });
+          renderSummaryTable(summaryBuckets, facetKeys);
           return;
         }
 
         panel.classList.remove("facets");
         panel.innerHTML = '<div id="taxonChart"></div>';
         const pointBuckets = new Map();
+        const summaryBuckets = new Map([["All", new Map()]]);
         sampleSet.forEach((sample) => {
           const meta = sampleMeta.get(sample) || {};
           const xKey =
@@ -1055,7 +2123,12 @@
           if (!pointBuckets.has(xKey)) {
             pointBuckets.set(xKey, []);
           }
+          const summaryMap = summaryBuckets.get("All");
+          if (!summaryMap.has(xKey)) {
+            summaryMap.set(xKey, []);
+          }
           const rawValue = sampleValues.get(sample) || 0;
+          if (!includeZeros && rawValue === 0) return;
           const adjustedValue =
             scaleType === "log"
               ? rawValue <= 0
@@ -1067,6 +2140,7 @@
             rawValue,
             adjustedValue,
           });
+          summaryMap.get(xKey).push(rawValue);
         });
         const stats = categories.map((category) => {
           const points = pointBuckets.get(category) || [];
@@ -1082,7 +2156,7 @@
           if (xIndex === undefined) return;
           points.forEach((point) => {
             scatter.push({
-              x: xIndex + stableJitter(point.sample, 0.18),
+              x: xIndex,
               y: point.adjustedValue,
               name: point.sample,
               rawValue: point.rawValue,
@@ -1120,7 +2194,7 @@
           },
           yAxis: {
             type: scaleType === "log" ? "logarithmic" : "linear",
-            min: scaleType === "log" ? epsilon / 10 : 0,
+            min: buildAxisMin(stats),
             max: buildAxisMax(stats),
             title: {
               text:
@@ -1166,32 +2240,926 @@
               name: taxon,
               data: scatter,
               color: PALETTE[3],
+              jitter: { x: jitterAmount },
+              pointPlacement: 0,
               marker: { radius: 3, lineWidth: 0 },
               showInLegend: false,
             },
           ],
           credits: { enabled: false },
         });
+        renderSummaryTable(summaryBuckets, ["All"]);
+      }
+
+      function renderAlphaPanel() {
+        const panel = document.getElementById("alphaChartPanel");
+        const panelTitle = document.getElementById("alphaPanelTitle");
+        const tableContainer = document.getElementById("alphaSummaryTable");
+        const statsContainer = document.getElementById("alphaStatsTable");
+        const significantContainer = document.getElementById("alphaSignificantTable");
+        if (!panel) return;
+
+        const renderEmpty = (message) => {
+          panel.classList.remove("facets");
+          panel.innerHTML = '<div id="alphaChart"></div>';
+          if (tableContainer) {
+            tableContainer.innerHTML = "";
+          }
+          if (statsContainer) {
+            statsContainer.innerHTML = "";
+          }
+          if (significantContainer) {
+            significantContainer.innerHTML = "";
+          }
+          if (panelTitle) {
+            panelTitle.textContent = "Alpha diversity by condition";
+          }
+          Highcharts.chart("alphaChart", {
+            chart: {
+              type: "boxplot",
+              height: 360,
+              backgroundColor: "transparent",
+            },
+            title: { text: null },
+            subtitle: { text: message },
+            xAxis: { categories: [] },
+            yAxis: { title: { text: "" } },
+            legend: { enabled: false },
+            series: [],
+            credits: { enabled: false },
+          });
+        };
+
+        if (!alphaState.rows.length) {
+          renderEmpty("No alpha diversity data loaded.");
+          return;
+        }
+
+        const alphaRows = getFilteredAlphaRows();
+        if (!alphaRows.length) {
+          renderEmpty("No alpha diversity data for selected filters.");
+          return;
+        }
+
+        const rank = alphaState.rank;
+        const metric = alphaState.type;
+        const condition = alphaState.condition;
+        const colorCondition = alphaState.colorCondition;
+        const metricFacet = colorCondition === "Metric";
+        const filtered = alphaRows.filter(
+          (row) => row.Rank === rank && (metricFacet || row.Type === metric)
+        );
+
+        if (!filtered.length) {
+          renderEmpty("No data for the selected options.");
+          return;
+        }
+
+        if (panelTitle) {
+          panelTitle.textContent = metricFacet
+            ? `Alpha diversity by condition (${rank})`
+            : `${metric} by condition (${rank})`;
+        }
+
+        const grouped = new Map();
+        const statsBuckets = new Map();
+        filtered.forEach((row) => {
+          const value = Number(row.Value);
+          if (!Number.isFinite(value)) return;
+          const xKey =
+            condition && condition !== "All"
+              ? row[condition] || "(Missing)"
+              : "All";
+          if (!grouped.has(xKey)) {
+            grouped.set(xKey, []);
+          }
+          grouped.get(xKey).push(row.Sample);
+
+          const colorKey = metricFacet
+            ? row.Type || "(Missing)"
+            : colorCondition && colorCondition !== "All"
+              ? row[colorCondition] || "(Missing)"
+              : "All";
+          if (!statsBuckets.has(colorKey)) {
+            statsBuckets.set(colorKey, new Map());
+          }
+          const colorMap = statsBuckets.get(colorKey);
+          if (!colorMap.has(xKey)) {
+            colorMap.set(xKey, []);
+          }
+          colorMap.get(xKey).push({
+            sample: row.Sample,
+            value,
+          });
+        });
+
+        let categories = [...grouped.keys()].sort((a, b) =>
+          String(a).localeCompare(String(b))
+        );
+        const categoryIndex = new Map();
+        categories.forEach((key, index) => {
+          categoryIndex.set(key, index);
+        });
+
+        const formatAxisLabel = function () {
+          return Highcharts.numberFormat(this.value, 3);
+        };
+
+        const buildAxisMax = (stats) => {
+          const dataMax = stats.length
+            ? Math.max(...stats.filter(Boolean).map((row) => row[4]))
+            : null;
+          return dataMax === null ? null : dataMax * 1.05;
+        };
+
+        const formatTooltipValue = (value) => Highcharts.numberFormat(value, 4);
+
+        const facetMode = colorCondition && colorCondition !== "All";
+        const facetKeys = facetMode
+          ? [...statsBuckets.keys()].sort((a, b) => String(a).localeCompare(String(b)))
+          : ["All"];
+
+        const renderSummaryTable = () => {
+          if (!tableContainer) return;
+          if (!categories.length) {
+            tableContainer.innerHTML = "";
+            return;
+          }
+          const escapeHtml = (value) =>
+            String(value)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#39;");
+          const formatCell = (value) =>
+            Number.isFinite(value) ? Highcharts.numberFormat(value, 4) : "-";
+          const rows = [];
+          facetKeys.forEach((facetKey) => {
+            const bucket = statsBuckets.get(facetKey) || new Map();
+            categories.forEach((category) => {
+              const points = bucket.get(category) || [];
+              const values = points.map((point) => point.value).filter(Number.isFinite);
+              const stats = computeBoxStats(values);
+              const mean = computeMean(values);
+              rows.push({
+                facet: facetKey,
+                category,
+                count: values.length,
+                min: stats ? stats[0] : null,
+                q1: stats ? stats[1] : null,
+                median: stats ? stats[2] : null,
+                q3: stats ? stats[3] : null,
+                max: stats ? stats[4] : null,
+                mean,
+              });
+            });
+          });
+          const columnKeys = ["count", "min", "q1", "median", "q3", "max", "mean"];
+          const createColumnStats = () =>
+            Object.fromEntries(columnKeys.map((key) => [key, { min: null, max: null }]));
+          const columnStats = createColumnStats();
+          const columnStatsByFacet = new Map();
+          rows.forEach((row) => {
+            const bucket = metricFacet
+              ? columnStatsByFacet.get(row.facet) || createColumnStats()
+              : columnStats;
+            columnKeys.forEach((key) => {
+              const value = row[key];
+              if (!Number.isFinite(value)) return;
+              const stats = bucket[key];
+              if (stats.min === null || value < stats.min) stats.min = value;
+              if (stats.max === null || value > stats.max) stats.max = value;
+            });
+            if (metricFacet) {
+              columnStatsByFacet.set(row.facet, bucket);
+            }
+          });
+          const lerp = (a, b, t) => Math.round(a + (b - a) * t);
+          const colorForValue = (value, key, facet) => {
+            if (!Number.isFinite(value)) return "";
+            const stats = metricFacet
+              ? (columnStatsByFacet.get(facet) || {})[key]
+              : columnStats[key];
+            if (!stats || stats.min === null || stats.max === null || stats.min === stats.max) {
+              return "background-color: #ffffff;";
+            }
+            const t = (value - stats.min) / (stats.max - stats.min);
+            let start;
+            let end;
+            let localT;
+            if (t <= 0.5) {
+              start = { r: 196, g: 214, b: 255 };
+              end = { r: 255, g: 255, b: 255 };
+              localT = t / 0.5;
+            } else {
+              start = { r: 255, g: 255, b: 255 };
+              end = { r: 255, g: 204, b: 204 };
+              localT = (t - 0.5) / 0.5;
+            }
+            const r = lerp(start.r, end.r, localT);
+            const g = lerp(start.g, end.g, localT);
+            const b = lerp(start.b, end.b, localT);
+            return `background-color: rgb(${r}, ${g}, ${b});`;
+          };
+
+          tableContainer.innerHTML = `
+            <table class="alpha-summary-table">
+              <thead>
+                <tr>
+                  <th>Facet</th>
+                  <th>${condition === "All" ? "x-Axis" : escapeHtml(condition)}</th>
+                  <th>N</th>
+                  <th>Min</th>
+                  <th>Q1</th>
+                  <th>Median</th>
+                  <th>Q3</th>
+                  <th>Max</th>
+                  <th>Mean</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows
+                  .map(
+                    (row) => `
+                      <tr>
+                        <td>${escapeHtml(row.facet)}</td>
+                        <td>${escapeHtml(row.category)}</td>
+                        <td style="${colorForValue(row.count, "count", row.facet)}">${row.count}</td>
+                        <td style="${colorForValue(
+                          row.min,
+                          "min",
+                          row.facet
+                        )}; font-style: italic;">${formatCell(row.min)}</td>
+                        <td style="${colorForValue(row.q1, "q1", row.facet)}">${formatCell(
+            row.q1
+          )}</td>
+                        <td style="${colorForValue(row.median, "median", row.facet)}">${formatCell(
+            row.median
+          )}</td>
+                        <td style="${colorForValue(row.q3, "q3", row.facet)}">${formatCell(
+            row.q3
+          )}</td>
+                        <td style="${colorForValue(
+                          row.max,
+                          "max",
+                          row.facet
+                        )}; font-weight: 700;">${formatCell(row.max)}</td>
+                        <td style="${colorForValue(row.mean, "mean", row.facet)}">${formatCell(
+            row.mean
+          )}</td>
+                      </tr>
+                    `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          `;
+        };
+
+        const renderSignificantTable = () => {
+          if (!significantContainer) return;
+          if (!alphaStats.rows.length) {
+            significantContainer.innerHTML = "";
+            return;
+          }
+          const formatP = (value) => {
+            const num = Number(value);
+            if (!Number.isFinite(num)) return value;
+            if (num < 0.001) return "<0.001";
+            return num.toFixed(3);
+          };
+          const activeFilters = new Map();
+          filterState.selections.forEach((selected, column) => {
+            const total = filterState.values.get(column)?.size || 0;
+            if (selected && selected.size && selected.size < total) {
+              activeFilters.set(column, selected);
+            }
+          });
+          const rows = alphaStats.rows
+            .map((row) => ({
+              ...row,
+              PAdjValue: Number(row.PAdj),
+              PValueValue: Number(row.PValue),
+            }))
+            .filter((row) => {
+              if (!activeFilters.size) return true;
+              const selected = activeFilters.get(row.MetaColumn);
+              if (!selected) return true;
+              return selected.has(row.Group1) && selected.has(row.Group2);
+            })
+            .map((row) => {
+              const pAdj = Number.isFinite(row.PAdjValue)
+                ? formatP(row.PAdjValue)
+                : "-";
+              const pVal = Number.isFinite(row.PValueValue)
+                ? formatP(row.PValueValue)
+                : "-";
+              return `
+                <tr>
+                  <td>${row.Rank}</td>
+                  <td>${row.MetaColumn}</td>
+                  <td>${row.Type}</td>
+                  <td>${row.Group1}</td>
+                  <td>${row.Group2}</td>
+                  <td>${pAdj}</td>
+                  <td>${pVal}</td>
+                  <td>${row.Test}</td>
+                </tr>
+              `;
+            })
+            .join("");
+          significantContainer.innerHTML = `
+            <table id="alphaSignificantDataTable" class="display" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Meta</th>
+                  <th>Type</th>
+                  <th>Group 1</th>
+                  <th>Group 2</th>
+                  <th>P (adj)</th>
+                  <th>P</th>
+                  <th>Test</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          `;
+          if (alphaSignificantDataTable) {
+            alphaSignificantDataTable.destroy();
+            alphaSignificantDataTable = null;
+          }
+          if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable) {
+            alphaSignificantDataTable = window.jQuery(
+              "#alphaSignificantDataTable"
+            ).DataTable({
+              paging: true,
+              pageLength: 10,
+              lengthChange: true,
+              info: true,
+              order: [[5, "asc"]],
+            });
+          }
+        };
+
+        const renderStatsTable = () => {
+          if (!statsContainer) return;
+          if (!alphaStats.rows.length) {
+            statsContainer.innerHTML = "";
+            return;
+          }
+          const metaColumn = condition;
+          if (!metaColumn || metaColumn === "All") {
+            statsContainer.innerHTML = "<div>No x-Axis selected for statistics.</div>";
+            return;
+          }
+          const metricFacet = colorCondition === "Metric";
+          const filteredStats = alphaStats.rows.filter((row) => {
+            if (row.MetaColumn !== metaColumn) return false;
+            if (row.Rank !== rank) return false;
+            return metricFacet || row.Type === metric;
+          });
+          if (!filteredStats.length) {
+            statsContainer.innerHTML = "<div>No statistics available for this selection.</div>";
+            return;
+          }
+          const types = metricFacet
+            ? [...new Set(filteredStats.map((row) => row.Type))]
+            : [metric];
+          const formatP = (value) => {
+            const num = Number(value);
+            if (!Number.isFinite(num)) return value;
+            if (num < 0.001) return "<0.001";
+            return num.toFixed(3);
+          };
+          const formatRatio = (value) => {
+            const num = Number(value);
+            if (!Number.isFinite(num)) return "-";
+            return `${num.toFixed(2)}x`;
+          };
+          const tables = types
+            .map((type) => {
+              const rows = alphaState.rows.filter(
+                (row) =>
+                  row.Rank === rank &&
+                  row.Type === type &&
+                  row[metaColumn] &&
+                  row[metaColumn] !== "All" &&
+                  Number.isFinite(row.Value)
+              );
+              const groups = [...new Set(rows.map((row) => row[metaColumn]))].sort((a, b) =>
+                String(a).localeCompare(String(b))
+              );
+              if (groups.length < 2) {
+                return `<div>No groups for ${type}.</div>`;
+              }
+              const means = new Map();
+              groups.forEach((group) => {
+                const values = rows
+                  .filter((row) => row[metaColumn] === group)
+                  .map((row) => row.Value);
+                means.set(group, computeMean(values));
+              });
+              const pMap = new Map();
+              filteredStats
+                .filter((row) => row.Type === type)
+                .forEach((row) => {
+                  const key = `${row.Group1}||${row.Group2}`;
+                  pMap.set(key, row.PAdj ?? row.PValue);
+                });
+              const cellFor = (rowGroup, colGroup, rowIdx, colIdx) => {
+                if (rowIdx === colIdx) return "—";
+                if (rowIdx > colIdx) {
+                  const numerator = means.get(rowGroup);
+                  const denominator = means.get(colGroup);
+                  if (!Number.isFinite(numerator) || !Number.isFinite(denominator)) {
+                    return "-";
+                  }
+                  return formatRatio(numerator / denominator);
+                }
+                const direct = pMap.get(`${rowGroup}||${colGroup}`);
+                const reverse = pMap.get(`${colGroup}||${rowGroup}`);
+                return formatP(direct ?? reverse ?? "-");
+              };
+              return `
+                <div class="chart-title">${type} (row/col ratio, upper triangle p)</div>
+                <table class="alpha-summary-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      ${groups.map((group) => `<th>${group}</th>`).join("")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${groups
+                      .map((rowGroup, rowIdx) => {
+                        const cells = groups
+                          .map((colGroup, colIdx) =>
+                            `<td>${cellFor(rowGroup, colGroup, rowIdx, colIdx)}</td>`
+                          )
+                          .join("");
+                        return `<tr><th>${rowGroup}</th>${cells}</tr>`;
+                      })
+                      .join("")}
+                  </tbody>
+                </table>
+              `;
+            })
+            .join("");
+          statsContainer.innerHTML = tables;
+
+        };
+
+        const xAxisTitle = condition === "All" ? "" : condition;
+        const yAxisTitle = metricFacet ? "Value" : metric;
+        const seriesLabel = metricFacet ? "Metric value" : metric;
+
+        const jitterAmount = 0.18;
+
+        const renderChart = (containerId, title, stats, scatter) => {
+          Highcharts.chart(containerId, {
+            chart: {
+              type: "boxplot",
+              height: 320,
+              backgroundColor: "transparent",
+            },
+            title: { text: title },
+            xAxis: {
+              categories,
+              title: { text: xAxisTitle },
+            },
+            yAxis: {
+              min: 0,
+              max: buildAxisMax(stats),
+              title: { text: yAxisTitle },
+              labels: { formatter: formatAxisLabel },
+            },
+            legend: { enabled: false },
+            tooltip: {
+              formatter: function () {
+                if (this.point && this.point.high !== undefined) {
+                  return [
+                    `<b>${this.category}</b><br/>`,
+                    `Min: ${formatTooltipValue(this.point.low)}<br/>`,
+                    `Q1: ${formatTooltipValue(this.point.q1)}<br/>`,
+                    `Median: ${formatTooltipValue(this.point.median)}<br/>`,
+                    `Q3: ${formatTooltipValue(this.point.q3)}<br/>`,
+                    `Max: ${formatTooltipValue(this.point.high)}`,
+                  ].join("");
+                }
+                return [
+                  `<b>${this.point.name}</b><br/>`,
+                  `${formatTooltipValue(this.y)}`,
+                ].join("");
+              },
+            },
+            series: [
+              {
+                name: seriesLabel,
+                data: stats,
+                color: PALETTE[0],
+                lineWidth: 1.5,
+              },
+              {
+                type: "scatter",
+                name: seriesLabel,
+                data: scatter,
+                color: PALETTE[3],
+                jitter: { x: jitterAmount },
+                pointPlacement: 0,
+                marker: { radius: 3, lineWidth: 0 },
+                showInLegend: false,
+              },
+            ],
+            credits: { enabled: false },
+          });
+        };
+
+        if (!facetMode) {
+          panel.classList.remove("facets");
+          panel.innerHTML = '<div id="alphaChart"></div>';
+          const bucket = statsBuckets.get("All") || new Map();
+          const stats = categories.map((category) => {
+            const points = bucket.get(category) || [];
+            return computeBoxStats(points.map((point) => point.value));
+          });
+          const scatter = [];
+          bucket.forEach((points, xKey) => {
+            const xIndex = categoryIndex.get(xKey);
+            if (xIndex === undefined) return;
+            points.forEach((point) => {
+              scatter.push({
+                x: xIndex,
+                y: point.value,
+                name: point.sample,
+              });
+            });
+          });
+          renderChart("alphaChart", null, stats, scatter);
+          renderSummaryTable();
+          renderStatsTable();
+          renderSignificantTable();
+          return;
+        }
+
+        panel.classList.add("facets");
+        panel.innerHTML = facetKeys
+          .map((key, idx) => `<div id="alphaFacet-${idx}"></div>`)
+          .join("");
+        facetKeys.forEach((key, idx) => {
+          const bucket = statsBuckets.get(key) || new Map();
+          const stats = categories.map((category) => {
+            const points = bucket.get(category) || [];
+            return computeBoxStats(points.map((point) => point.value));
+          });
+          const scatter = [];
+          bucket.forEach((points, xKey) => {
+            const xIndex = categoryIndex.get(xKey);
+            if (xIndex === undefined) return;
+            points.forEach((point) => {
+              scatter.push({
+                x: xIndex,
+                y: point.value,
+                name: point.sample,
+              });
+            });
+          });
+          renderChart(`alphaFacet-${idx}`, key, stats, scatter);
+        });
+        renderSummaryTable();
+        renderStatsTable();
+        renderSignificantTable();
+      }
+
+      function renderBetaPanel() {
+        const panel = document.getElementById("betaChartPanel");
+        const panelTitle = document.getElementById("betaPanelTitle");
+        const tableContainer = document.getElementById("betaSummaryTable");
+        const statsContainer = document.getElementById("betaStatsTable");
+        if (!panel) return;
+
+        const renderEmpty = (message) => {
+          panel.innerHTML = '<div id="betaChart"></div>';
+          if (tableContainer) {
+            tableContainer.innerHTML = "";
+          }
+          if (statsContainer) {
+            statsContainer.innerHTML = "";
+          }
+          if (panelTitle) {
+            panelTitle.textContent = "Beta diversity by condition";
+          }
+          Highcharts.chart("betaChart", {
+            chart: {
+              type: "boxplot",
+              height: 360,
+              backgroundColor: "transparent",
+            },
+            title: { text: null },
+            subtitle: { text: message },
+            xAxis: { categories: [] },
+            yAxis: { title: { text: "" } },
+            legend: { enabled: false },
+            series: [],
+            credits: { enabled: false },
+          });
+        };
+
+        if (!betaState.rows.length) {
+          renderEmpty("No beta diversity data loaded.");
+          return;
+        }
+
+        const metric = betaState.metric;
+        const condition = betaState.condition;
+        const filtered = betaState.rows.filter(
+          (row) => row.Metric === metric && betaRowPassesFilters(row)
+        );
+
+        if (!filtered.length) {
+          renderEmpty("No data for the selected options.");
+          return;
+        }
+
+        if (panelTitle) {
+          panelTitle.textContent = `${metric} distances by condition`;
+        }
+
+        panel.innerHTML = '<div id="betaChart"></div>';
+
+        const buckets = new Map();
+        const distances = [];
+        filtered.forEach((row) => {
+          if (!Number.isFinite(row.Distance)) return;
+          const meta1 = state.sampleMetaMap.get(row.Sample1) || {};
+          const meta2 = state.sampleMetaMap.get(row.Sample2) || {};
+          const group1 =
+            condition && condition !== "All"
+              ? normalizeMetaValue(meta1[condition])
+              : "All";
+          const group2 =
+            condition && condition !== "All"
+              ? normalizeMetaValue(meta2[condition])
+              : "All";
+          const key =
+            group1 === group2
+              ? group1
+              : [group1, group2].sort((a, b) => String(a).localeCompare(String(b))).join(" vs ");
+          if (!buckets.has(key)) {
+            buckets.set(key, []);
+          }
+          buckets.get(key).push({
+            distance: row.Distance,
+            sample: `${row.Sample1} vs ${row.Sample2}`,
+          });
+          distances.push(row.Distance);
+        });
+
+        const categories = [...buckets.keys()].sort((a, b) =>
+          String(a).localeCompare(String(b))
+        );
+        const categoryIndex = new Map();
+        categories.forEach((key, index) => {
+          categoryIndex.set(key, index);
+        });
+
+        const stats = categories.map((category) => {
+          const points = buckets.get(category) || [];
+          return computeBoxStats(points.map((point) => point.distance));
+        });
+        const scatter = [];
+        buckets.forEach((points, key) => {
+          const xIndex = categoryIndex.get(key);
+          if (xIndex === undefined) return;
+          points.forEach((point) => {
+            scatter.push({
+              x: xIndex,
+              y: point.distance,
+              name: point.sample,
+            });
+          });
+        });
+
+        const maxValue = distances.length ? Math.max(...distances) : null;
+        const yMax = maxValue === null ? null : Math.min(1, maxValue * 1.05);
+        const jitterAmount = 0.18;
+
+        Highcharts.chart("betaChart", {
+          chart: {
+            type: "boxplot",
+            height: 360,
+            backgroundColor: "transparent",
+          },
+          title: { text: null },
+          xAxis: {
+            categories,
+            title: { text: condition === "All" ? "" : condition },
+          },
+          yAxis: {
+            min: 0,
+            max: yMax,
+            title: { text: "Distance" },
+          },
+          legend: { enabled: false },
+          tooltip: {
+            formatter: function () {
+              if (this.point && this.point.high !== undefined) {
+                return [
+                  `<b>${this.category}</b><br/>`,
+                  `Min: ${this.point.low.toFixed(4)}<br/>`,
+                  `Q1: ${this.point.q1.toFixed(4)}<br/>`,
+                  `Median: ${this.point.median.toFixed(4)}<br/>`,
+                  `Q3: ${this.point.q3.toFixed(4)}<br/>`,
+                  `Max: ${this.point.high.toFixed(4)}`,
+                ].join("");
+              }
+              return [
+                `<b>${this.point.name}</b><br/>`,
+                `${this.y.toFixed(4)}`,
+              ].join("");
+            },
+          },
+          series: [
+            {
+              name: metric,
+              data: stats,
+              color: PALETTE[0],
+              lineWidth: 1.5,
+            },
+            {
+              type: "scatter",
+              name: metric,
+              data: scatter,
+              color: PALETTE[3],
+              jitter: { x: jitterAmount },
+              pointPlacement: 0,
+              marker: { radius: 3, lineWidth: 0 },
+              showInLegend: false,
+            },
+          ],
+          credits: { enabled: false },
+        });
+
+        if (tableContainer) {
+          if (!categories.length) {
+            tableContainer.innerHTML = "";
+          } else {
+            const formatCell = (value) =>
+              Number.isFinite(value) ? value.toFixed(4) : "-";
+            const rows = categories.map((category) => {
+              const points = buckets.get(category) || [];
+              const values = points.map((point) => point.distance);
+              const statsRow = computeBoxStats(values);
+              const mean = computeMean(values);
+              return {
+                category,
+                count: values.length,
+                min: statsRow ? statsRow[0] : null,
+                q1: statsRow ? statsRow[1] : null,
+                median: statsRow ? statsRow[2] : null,
+                q3: statsRow ? statsRow[3] : null,
+                max: statsRow ? statsRow[4] : null,
+                mean,
+              };
+            });
+            tableContainer.innerHTML = `
+              <table class="alpha-summary-table">
+                <thead>
+                  <tr>
+                    <th>Pair</th>
+                    <th>N</th>
+                    <th>Min</th>
+                    <th>Q1</th>
+                    <th>Median</th>
+                    <th>Q3</th>
+                    <th>Max</th>
+                    <th>Mean</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows
+                    .map(
+                      (row) => `
+                        <tr>
+                          <td>${row.category}</td>
+                          <td>${row.count}</td>
+                          <td>${formatCell(row.min)}</td>
+                          <td>${formatCell(row.q1)}</td>
+                          <td>${formatCell(row.median)}</td>
+                          <td>${formatCell(row.q3)}</td>
+                          <td>${formatCell(row.max)}</td>
+                          <td>${formatCell(row.mean)}</td>
+                        </tr>
+                      `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            `;
+          }
+        }
+
+        if (statsContainer) {
+          if (!betaStats.rows.length) {
+            statsContainer.innerHTML = "";
+          } else if (!condition || condition === "All") {
+            statsContainer.innerHTML = "<div>No x-Axis selected for PERMANOVA.</div>";
+          } else {
+            const filteredStats = betaStats.rows.filter(
+              (row) => row.Metric === metric && row.MetaColumn === condition
+            );
+            if (!filteredStats.length) {
+              statsContainer.innerHTML = "<div>No PERMANOVA results for this selection.</div>";
+            } else {
+              const formatP = (value) => {
+                const num = Number(value);
+                if (!Number.isFinite(num)) return value;
+                if (num < 0.001) return "<0.001";
+                return num.toFixed(3);
+              };
+              statsContainer.innerHTML = `
+                <table class="alpha-summary-table">
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      <th>Meta</th>
+                      <th>Df</th>
+                      <th>R2</th>
+                      <th>F</th>
+                      <th>P</th>
+                      <th>P (adj)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${filteredStats
+                      .map(
+                        (row) => `
+                          <tr>
+                            <td>${row.Metric}</td>
+                            <td>${row.MetaColumn}</td>
+                            <td>${row.Df}</td>
+                            <td>${Number(row.R2).toFixed(4)}</td>
+                            <td>${Number(row.F).toFixed(3)}</td>
+                            <td>${formatP(row.PValue)}</td>
+                            <td>${formatP(row.PAdj)}</td>
+                          </tr>
+                        `
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              `;
+            }
+          }
+        }
       }
 
       function renderCharts(rank, groupBy, taxonOrder) {
         state.activeRank = rank;
+        const filteredRows = getFilteredTaxaRows();
         const data = computeRankData(
           rank,
           groupBy,
           taxonOrder,
           state.pinnedTaxon,
           state.topN,
-          state.sampleLimit
+          state.sampleLimit,
+          filteredRows
         );
-        const hasAbsolute = hasTypeForRank(rank, "AbsoluteAbundance");
+        const hasAbsolute = hasTypeForRank(rank, "AbsoluteAbundance", filteredRows);
         const chartsContainer = document.getElementById("mainCharts");
+        const ensureChartCard = (chartId, title, cardId) => {
+          const existing = document.getElementById(chartId);
+          if (existing) return existing;
+          if (!chartsContainer) return null;
+          const card = document.createElement("div");
+          card.className = "chart-card";
+          if (cardId) card.id = cardId;
+          card.innerHTML = `<div class="chart-title">${title}</div><div id="${chartId}"></div>`;
+          chartsContainer.appendChild(card);
+          return document.getElementById(chartId);
+        };
+        const relativeChartEl = ensureChartCard(
+          "relativeChart",
+          "Relative abundance"
+        );
+        const absoluteChartEl = ensureChartCard(
+          "absoluteChart",
+          "Absolute abundance",
+          "absoluteCard"
+        );
         const absoluteCard = document.getElementById("absoluteCard");
         if (chartsContainer) {
           chartsContainer.classList.toggle("single", !hasAbsolute);
         }
         if (absoluteCard) {
           absoluteCard.hidden = !hasAbsolute;
+        }
+        if (!relativeChartEl) {
+          throw new Error("Missing chart container for taxonomic profiling.");
         }
         if (!hasAbsolute && state.charts.absolute) {
           state.charts.absolute.destroy();
@@ -1240,6 +3208,7 @@
             title: { text: null },
             labels: {
               style: { fontSize: "11px" },
+              step: 1,
               useHTML: true,
               formatter: function () {
                 if (isSpacerLabel(this.value)) return "";
@@ -1297,15 +3266,7 @@
               point: {
                 events: {
                   click: function () {
-                    state.pinnedTaxon = this.series.name;
-                    state.mainPending.pinnedTaxon = state.pinnedTaxon;
-                    state.mainDirty = true;
-                    updateMainRefreshState();
-                    const taxonPinSelect = document.getElementById("taxonPinSelect");
-                    if (taxonPinSelect) {
-                      taxonPinSelect.value = state.pinnedTaxon;
-                    }
-                    renderTaxonPanel(rank);
+                    setPinnedTaxon(this.series.name, rank);
                   },
                 },
               },
@@ -1349,6 +3310,7 @@
             categories: data.samples,
             title: { text: null },
             labels: {
+              step: 1,
               useHTML: true,
               formatter: function () {
                 if (isSpacerLabel(this.value)) return "";
@@ -1394,15 +3356,7 @@
               point: {
                 events: {
                   click: function () {
-                    state.pinnedTaxon = this.series.name;
-                    state.mainPending.pinnedTaxon = state.pinnedTaxon;
-                    state.mainDirty = true;
-                    updateMainRefreshState();
-                    const taxonPinSelect = document.getElementById("taxonPinSelect");
-                    if (taxonPinSelect) {
-                      taxonPinSelect.value = state.pinnedTaxon;
-                    }
-                    renderTaxonPanel(rank);
+                    setPinnedTaxon(this.series.name, rank);
                   },
                 },
               },
@@ -1417,8 +3371,17 @@
       function init() {
         try {
           // Load the TSV payload embedded in the HTML (script#taxaData) and build the data rows.
-          const text = document.getElementById("taxaData").textContent;
-          state.rows = parseTSV(text);
+          const taxaTextEl = document.getElementById("taxaData");
+          const taxaMetaEl = document.getElementById("taxaMeta");
+          const metaRows = taxaMetaEl ? parseTSV(taxaMetaEl.textContent) : [];
+          const text = taxaTextEl ? taxaTextEl.textContent : "";
+          state.rows = parseTaxaRows(text, metaRows);
+          state.sampleMetaMap = new Map(
+            (metaRows.length ? metaRows : state.rows).map((row) => [
+              row.Sample,
+              row,
+            ])
+          );
           state.ranks = uniqueRanks(state.rows);
 
           const rankSelect = document.getElementById("rankSelect");
@@ -1433,6 +3396,9 @@
           state.metaColumns = getMetaColumns(state.rows);
           state.metaColumns = state.metaColumns.filter((column) => column !== "All");
           state.metaColumns.unshift("All");
+          setupFilterOverlay();
+          setupTableToggles();
+          initializeFilters();
           const groupSelect = document.getElementById("groupSelect");
           groupSelect.innerHTML = "";
           ["None", ...state.metaColumns].forEach((column) => {
@@ -1443,39 +3409,59 @@
           });
 
           const mainRefreshButton = document.getElementById("taxonRefresh");
-          const updateMainRefreshState = () => {
-            mainRefreshButton.disabled = !state.mainDirty;
-          };
+          const mainAutoRefresh = document.getElementById("taxonAutoRefresh");
+          state.mainRefreshButton = mainRefreshButton;
+          updateMainRefreshState();
+          if (mainAutoRefresh) {
+            mainAutoRefresh.checked = state.mainAutoRefresh;
+            mainAutoRefresh.addEventListener("change", (event) => {
+              state.mainAutoRefresh = event.target.checked;
+              if (state.mainAutoRefresh && state.mainDirty) {
+                mainRefreshButton.click();
+              }
+            });
+          }
 
           rankSelect.addEventListener("change", (event) => {
             state.mainPending.rank = event.target.value;
             state.mainPending.pinnedTaxon = null;
             state.mainDirty = true;
             updateMainRefreshState();
+            if (state.mainAutoRefresh) {
+              mainRefreshButton.click();
+            }
           });
           groupSelect.addEventListener("change", (event) => {
             state.mainPending.groupBy = event.target.value;
             state.mainDirty = true;
             updateMainRefreshState();
+            if (state.mainAutoRefresh) {
+              mainRefreshButton.click();
+            }
           });
 
           const taxonOrderSelect = document.getElementById("taxonOrderSelect");
-          taxonOrderSelect.innerHTML = "";
-          [
-            { value: "total_desc", label: "Total abundance (desc)" },
-            { value: "total_asc", label: "Total abundance (asc)" },
-            { value: "alphabetical", label: "Alphabetical" },
-          ].forEach((item) => {
-            const option = document.createElement("option");
-            option.value = item.value;
-            option.textContent = item.label;
-            taxonOrderSelect.appendChild(option);
-          });
-          taxonOrderSelect.addEventListener("change", (event) => {
-            state.mainPending.taxonOrder = event.target.value;
-            state.mainDirty = true;
-            updateMainRefreshState();
-          });
+          if (taxonOrderSelect) {
+            taxonOrderSelect.innerHTML = "";
+            [
+              { value: "total_desc", label: "Total abundance (desc)" },
+              { value: "total_asc", label: "Total abundance (asc)" },
+              { value: "alphabetical", label: "Alphabetical" },
+            ].forEach((item) => {
+              const option = document.createElement("option");
+              option.value = item.value;
+              option.textContent = item.label;
+              taxonOrderSelect.appendChild(option);
+            });
+            taxonOrderSelect.addEventListener("change", (event) => {
+              state.mainPending.taxonOrder = event.target.value;
+              state.mainDirty = true;
+              updateMainRefreshState();
+              if (state.mainAutoRefresh) {
+                mainRefreshButton.click();
+              }
+            });
+          }
 
           const conditionSelect = document.getElementById("conditionSelect");
           conditionSelect.innerHTML = "";
@@ -1486,14 +3472,23 @@
             conditionSelect.appendChild(option);
           });
           const refreshPanelButton = document.getElementById("taxonRefreshPanel");
+          const panelAutoRefresh = document.getElementById("taxonPanelAutoRefresh");
           const setLoading = (id, isLoading) => {
             const overlay = document.getElementById(id);
             if (!overlay) return;
             overlay.hidden = !isLoading;
           };
-          const updateTaxonRefreshState = () => {
-            refreshPanelButton.disabled = !state.taxonDirty;
-          };
+          state.taxonRefreshButton = refreshPanelButton;
+          updateTaxonRefreshState();
+          if (panelAutoRefresh) {
+            panelAutoRefresh.checked = state.taxonAutoRefresh;
+            panelAutoRefresh.addEventListener("change", (event) => {
+              state.taxonAutoRefresh = event.target.checked;
+              if (state.taxonAutoRefresh && state.taxonDirty) {
+                refreshPanelButton.click();
+              }
+            });
+          }
 
           state.taxonCondition = state.metaColumns[0] || "All";
           state.taxonColorCondition = "All";
@@ -1502,23 +3497,26 @@
             abundanceType: state.taxonAbundanceType,
             scale: state.taxonScale,
             colorCondition: state.taxonColorCondition,
+            includeZeros: state.taxonIncludeZeros,
           };
           conditionSelect.value = state.taxonPending.condition;
           conditionSelect.addEventListener("change", (event) => {
             state.taxonPending.condition = event.target.value;
             state.taxonDirty = true;
             updateTaxonRefreshState();
+            if (state.taxonAutoRefresh) {
+              refreshPanelButton.click();
+            }
           });
 
-          const taxonPinSelect = document.getElementById("taxonPinSelect");
-          taxonPinSelect.addEventListener("change", (event) => {
-            state.pinnedTaxon =
-              event.target.value === "None" ? null : event.target.value;
-            state.mainPending.pinnedTaxon = state.pinnedTaxon;
-            state.mainDirty = true;
-            updateMainRefreshState();
-            renderTaxonPanel(rankSelect.value);
-          });
+          state.taxonDropdown = createSearchDropdown(
+            document.getElementById("taxonPinDropdown"),
+            (value) => setPinnedTaxon(value, rankSelect.value)
+          );
+          state.taxonPanelDropdown = createSearchDropdown(
+            document.getElementById("taxonPanelPinDropdown"),
+            (value) => setPinnedTaxon(value, rankSelect.value)
+          );
 
           const topNInput = document.getElementById("topNInput");
           topNInput.value = String(state.topN);
@@ -1528,6 +3526,15 @@
             event.target.value = String(state.mainPending.topN);
             state.mainDirty = true;
             updateMainRefreshState();
+            updatePinOptions(
+              state.activeRank || state.mainPending.rank,
+              state.mainPending.groupBy,
+              state.mainPending.taxonOrder,
+              state.mainPending.topN
+            );
+            if (state.mainAutoRefresh) {
+              mainRefreshButton.click();
+            }
           });
 
           if (!state.mainPending) {
@@ -1559,7 +3566,9 @@
             : state.ranks[0];
           rankSelect.value = defaultRank;
           groupSelect.value = "None";
-          taxonOrderSelect.value = state.taxonOrder;
+          if (taxonOrderSelect) {
+            taxonOrderSelect.value = state.taxonOrder;
+          }
           updatePinOptions(defaultRank, state.groupBy, state.taxonOrder);
           const abundanceTypeSelect = document.getElementById("abundanceTypeSelect");
           abundanceTypeSelect.innerHTML = "";
@@ -1581,6 +3590,9 @@
             state.taxonPending.abundanceType = event.target.value;
             state.taxonDirty = true;
             updateTaxonRefreshState();
+            if (state.taxonAutoRefresh) {
+              refreshPanelButton.click();
+            }
           });
           const taxonScaleSelect = document.getElementById("taxonScaleSelect");
           taxonScaleSelect.innerHTML = "";
@@ -1599,7 +3611,22 @@
             state.taxonPending.scale = event.target.value;
             state.taxonDirty = true;
             updateTaxonRefreshState();
+            if (state.taxonAutoRefresh) {
+              refreshPanelButton.click();
+            }
           });
+          const taxonIncludeZeros = document.getElementById("taxonIncludeZeros");
+          if (taxonIncludeZeros) {
+            taxonIncludeZeros.checked = state.taxonIncludeZeros;
+            taxonIncludeZeros.addEventListener("change", (event) => {
+              state.taxonPending.includeZeros = event.target.checked;
+              state.taxonDirty = true;
+              updateTaxonRefreshState();
+              if (state.taxonAutoRefresh) {
+                refreshPanelButton.click();
+              }
+            });
+          }
           const colorConditionSelect = document.getElementById("colorConditionSelect");
           colorConditionSelect.innerHTML = "";
           state.metaColumns.forEach((column) => {
@@ -1614,12 +3641,16 @@
             state.taxonPending.colorCondition = event.target.value;
             state.taxonDirty = true;
             updateTaxonRefreshState();
+            if (state.taxonAutoRefresh) {
+              refreshPanelButton.click();
+            }
           });
           const applyTaxonRefresh = () => {
             state.taxonCondition = state.taxonPending.condition;
             state.taxonAbundanceType = state.taxonPending.abundanceType;
             state.taxonScale = state.taxonPending.scale;
             state.taxonColorCondition = state.taxonPending.colorCondition;
+            state.taxonIncludeZeros = state.taxonPending.includeZeros;
             state.taxonDirty = false;
             updateTaxonRefreshState();
             const scrollY = window.scrollY;
@@ -1636,6 +3667,284 @@
           refreshPanelButton.addEventListener("click", applyTaxonRefresh);
           updateTaxonRefreshState();
           setLoading("taxonPanelLoading", false);
+
+          const alphaTextEl = document.getElementById("alphaData");
+          const alphaStatsEl = document.getElementById("alphaStats");
+          const alphaStatus = document.getElementById("alphaStatus");
+          alphaStats.rows =
+            alphaStatsEl && alphaStatsEl.textContent.trim()
+              ? parseTSV(alphaStatsEl.textContent)
+              : [];
+          if (alphaTextEl && alphaTextEl.textContent.trim()) {
+            alphaState.rows = parseAlphaRows(alphaTextEl.textContent, metaRows);
+            alphaState.ranks = uniqueRanks(alphaState.rows);
+            alphaState.types = uniqueTypes(alphaState.rows);
+            alphaState.metaColumns = state.metaColumns.slice();
+            if (alphaState.ranks.length && alphaState.types.length) {
+              const alphaRankSelect = document.getElementById("alphaRankSelect");
+              const alphaTypeSelect = document.getElementById("alphaTypeSelect");
+              const alphaConditionSelect = document.getElementById("alphaConditionSelect");
+              const alphaColorConditionSelect = document.getElementById(
+                "alphaColorConditionSelect"
+              );
+              const alphaRefreshButton = document.getElementById("alphaRefreshPanel");
+              const alphaAutoRefresh = document.getElementById("alphaAutoRefresh");
+
+              alphaRankSelect.innerHTML = "";
+              alphaState.ranks.forEach((rank) => {
+                const option = document.createElement("option");
+                option.value = rank;
+                option.textContent = rank;
+                alphaRankSelect.appendChild(option);
+              });
+
+              alphaTypeSelect.innerHTML = "";
+              alphaState.types.forEach((type) => {
+                const option = document.createElement("option");
+                option.value = type;
+                option.textContent = type;
+                alphaTypeSelect.appendChild(option);
+              });
+
+              const conditionOptions = alphaState.metaColumns.filter(
+                (column) => column !== "Metric"
+              );
+              alphaConditionSelect.innerHTML = "";
+              conditionOptions.forEach((column) => {
+                const option = document.createElement("option");
+                option.value = column;
+                option.textContent = column;
+                alphaConditionSelect.appendChild(option);
+              });
+
+              alphaColorConditionSelect.innerHTML = "";
+              ["Metric", ...alphaState.metaColumns.filter((column) => column !== "Metric")].forEach((column) => {
+                const option = document.createElement("option");
+                option.value = column;
+                option.textContent = column;
+                alphaColorConditionSelect.appendChild(option);
+              });
+
+              alphaState.rank = alphaState.ranks.includes("Genus")
+                ? "Genus"
+                : alphaState.ranks[0];
+              alphaState.type = alphaState.types.includes("Shannon")
+                ? "Shannon"
+                : alphaState.types[0];
+              alphaState.condition = alphaState.metaColumns[0] || "All";
+              if (!conditionOptions.includes(alphaState.condition)) {
+                alphaState.condition = conditionOptions[0] || "All";
+              }
+              alphaState.colorCondition = "All";
+              alphaState.pending = {
+                rank: alphaState.rank,
+                type: alphaState.type,
+                condition: alphaState.condition,
+                colorCondition: alphaState.colorCondition,
+              };
+              alphaRankSelect.value = alphaState.rank;
+              alphaTypeSelect.value = alphaState.type;
+              alphaConditionSelect.value = alphaState.condition;
+              alphaColorConditionSelect.value = alphaState.colorCondition;
+
+              const updateAlphaMetricFacet = (facetValue) => {
+                const metricFacet = facetValue === "Metric";
+                alphaTypeSelect.disabled = metricFacet;
+              };
+              updateAlphaMetricFacet(alphaState.colorCondition);
+
+              const updateAlphaRefreshState = () => {
+                alphaRefreshButton.disabled = !alphaState.dirty;
+              };
+              if (alphaAutoRefresh) {
+                alphaAutoRefresh.checked = alphaState.autoRefresh;
+                alphaAutoRefresh.addEventListener("change", (event) => {
+                  alphaState.autoRefresh = event.target.checked;
+                  if (alphaState.autoRefresh && alphaState.dirty) {
+                    alphaRefreshButton.click();
+                  }
+                });
+              }
+
+              alphaRankSelect.addEventListener("change", (event) => {
+                alphaState.pending.rank = event.target.value;
+                alphaState.dirty = true;
+                updateAlphaRefreshState();
+                if (alphaState.autoRefresh) {
+                  alphaRefreshButton.click();
+                }
+              });
+              alphaTypeSelect.addEventListener("change", (event) => {
+                alphaState.pending.type = event.target.value;
+                alphaState.dirty = true;
+                updateAlphaRefreshState();
+                if (alphaState.autoRefresh) {
+                  alphaRefreshButton.click();
+                }
+              });
+              alphaConditionSelect.addEventListener("change", (event) => {
+                alphaState.pending.condition = event.target.value;
+                alphaState.dirty = true;
+                updateAlphaRefreshState();
+                if (alphaState.autoRefresh) {
+                  alphaRefreshButton.click();
+                }
+              });
+              alphaColorConditionSelect.addEventListener("change", (event) => {
+                alphaState.pending.colorCondition = event.target.value;
+                updateAlphaMetricFacet(event.target.value);
+                alphaState.dirty = true;
+                updateAlphaRefreshState();
+                if (alphaState.autoRefresh) {
+                  alphaRefreshButton.click();
+                }
+              });
+
+              const applyAlphaRefresh = () => {
+                alphaState.rank = alphaState.pending.rank;
+                alphaState.type = alphaState.pending.type;
+                alphaState.condition = alphaState.pending.condition;
+                alphaState.colorCondition = alphaState.pending.colorCondition;
+                alphaState.dirty = false;
+                updateAlphaRefreshState();
+                setLoading("alphaPanelLoading", true);
+                requestAnimationFrame(() => {
+                  try {
+                    renderAlphaPanel();
+                  } finally {
+                    setLoading("alphaPanelLoading", false);
+                  }
+                });
+              };
+
+              alphaRefreshButton.addEventListener("click", applyAlphaRefresh);
+              updateAlphaRefreshState();
+              setLoading("alphaPanelLoading", false);
+              renderAlphaPanel();
+              if (alphaStatus) {
+                alphaStatus.textContent =
+                  "Loaded " + alphaState.rows.length + " alpha rows.";
+              }
+            } else if (alphaStatus) {
+              alphaStatus.textContent = "Alpha diversity data is missing ranks or types.";
+            }
+          } else if (alphaStatus) {
+            alphaStatus.textContent = "No alpha diversity data embedded.";
+          }
+
+          const betaTextEl = document.getElementById("betaData");
+          const betaStatsEl = document.getElementById("betaStats");
+          const betaStatus = document.getElementById("betaStatus");
+          betaStats.rows =
+            betaStatsEl && betaStatsEl.textContent.trim()
+              ? parseTSV(betaStatsEl.textContent)
+              : [];
+          if (betaTextEl && betaTextEl.textContent.trim()) {
+            betaState.rows = parseBetaRows(betaTextEl.textContent);
+            betaState.metrics = [
+              ...new Set(betaState.rows.map((row) => row.Metric)),
+            ].sort((a, b) => String(a).localeCompare(String(b)));
+            betaState.metaColumns = state.metaColumns.slice();
+            if (betaState.metrics.length) {
+              const betaMetricSelect = document.getElementById("betaMetricSelect");
+              const betaConditionSelect = document.getElementById("betaConditionSelect");
+              const betaRefreshButton = document.getElementById("betaRefreshPanel");
+              const betaAutoRefresh = document.getElementById("betaAutoRefresh");
+
+              if (betaMetricSelect) {
+                betaMetricSelect.innerHTML = "";
+                betaState.metrics.forEach((metric) => {
+                  const option = document.createElement("option");
+                  option.value = metric;
+                  option.textContent = metric;
+                  betaMetricSelect.appendChild(option);
+                });
+              }
+              if (betaConditionSelect) {
+                betaConditionSelect.innerHTML = "";
+                betaState.metaColumns.forEach((column) => {
+                  const option = document.createElement("option");
+                  option.value = column;
+                  option.textContent = column;
+                  betaConditionSelect.appendChild(option);
+                });
+              }
+
+              betaState.metric = betaState.metrics[0];
+              betaState.condition = betaState.metaColumns[0] || "All";
+              betaState.pending = {
+                metric: betaState.metric,
+                condition: betaState.condition,
+              };
+              if (betaMetricSelect) {
+                betaMetricSelect.value = betaState.metric;
+              }
+              if (betaConditionSelect) {
+                betaConditionSelect.value = betaState.condition;
+              }
+
+              const updateBetaRefreshState = () => {
+                if (!betaRefreshButton) return;
+                betaRefreshButton.disabled = !betaState.dirty;
+              };
+              if (betaAutoRefresh) {
+                betaAutoRefresh.checked = betaState.autoRefresh;
+                betaAutoRefresh.addEventListener("change", (event) => {
+                  betaState.autoRefresh = event.target.checked;
+                  if (betaState.autoRefresh && betaState.dirty && betaRefreshButton) {
+                    betaRefreshButton.click();
+                  }
+                });
+              }
+              if (betaMetricSelect) {
+                betaMetricSelect.addEventListener("change", (event) => {
+                  betaState.pending.metric = event.target.value;
+                  betaState.dirty = true;
+                  updateBetaRefreshState();
+                  if (betaState.autoRefresh && betaRefreshButton) {
+                    betaRefreshButton.click();
+                  }
+                });
+              }
+              if (betaConditionSelect) {
+                betaConditionSelect.addEventListener("change", (event) => {
+                  betaState.pending.condition = event.target.value;
+                  betaState.dirty = true;
+                  updateBetaRefreshState();
+                  if (betaState.autoRefresh && betaRefreshButton) {
+                    betaRefreshButton.click();
+                  }
+                });
+              }
+              if (betaRefreshButton) {
+                betaRefreshButton.addEventListener("click", () => {
+                  betaState.metric = betaState.pending.metric;
+                  betaState.condition = betaState.pending.condition;
+                  betaState.dirty = false;
+                  updateBetaRefreshState();
+                  setLoading("betaPanelLoading", true);
+                  requestAnimationFrame(() => {
+                    try {
+                      renderBetaPanel();
+                    } finally {
+                      setLoading("betaPanelLoading", false);
+                    }
+                  });
+                });
+              }
+              updateBetaRefreshState();
+              setLoading("betaPanelLoading", false);
+              renderBetaPanel();
+              if (betaStatus) {
+                betaStatus.textContent =
+                  "Loaded " + betaState.rows.length + " beta rows.";
+              }
+            } else if (betaStatus) {
+              betaStatus.textContent = "No beta diversity metrics found.";
+            }
+          } else if (betaStatus) {
+            betaStatus.textContent = "No beta diversity data embedded.";
+          }
 
           state.mainPending = {
             rank: defaultRank,
@@ -1655,7 +3964,12 @@
             state.mainDirty = false;
             updateMainRefreshState();
             updatePinOptions(state.mainPending.rank, state.groupBy, state.taxonOrder);
-            taxonPinSelect.value = state.pinnedTaxon || "None";
+            if (state.taxonDropdown) {
+              state.taxonDropdown.setValue(state.pinnedTaxon || "");
+            }
+            if (state.taxonPanelDropdown) {
+              state.taxonPanelDropdown.setValue(state.pinnedTaxon || "");
+            }
             setLoading("mainChartsLoading", true);
             requestAnimationFrame(() => {
               try {
