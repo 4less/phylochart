@@ -53,25 +53,57 @@ if (opts$filter_treatment) {
   }
 }
 
-methods <- c("bray", "jaccard")
+ranks <- tax_table(ps) %>%
+  colnames() %>%
+  intersect(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
+if (!length(ranks)) {
+  ranks <- "All"
+}
+
+methods <- c("bray", "jaccard", "clr+euclidean")
 all_rows <- list()
 
-for (method in methods) {
-  message("Computing beta distances: ", method)
-  dist <- phyloseq::distance(ps, method = method)
-  mat <- as.matrix(dist)
-  if (!nrow(mat)) next
-  samples <- rownames(mat)
-  idx_pairs <- which(upper.tri(mat), arr.ind = TRUE)
-  rows <- data.frame(
-    Sample1 = samples[idx_pairs[, 1]],
-    Sample2 = samples[idx_pairs[, 2]],
-    Metric = method,
-    Distance = mat[idx_pairs],
-    row.names = NULL,
-    stringsAsFactors = FALSE
+build_rank_ps <- function(rank) {
+  if (rank == "All") {
+    return(ps)
+  }
+  tax_glom(
+    ps,
+    taxrank = rank,
+    NArm = TRUE,
+    bad_empty = c(NA, "", " ", "\t")
   )
-  all_rows[[method]] <- rows
+}
+
+for (method in methods) {
+  for (rank in ranks) {
+    message("Computing beta distances: ", method, " (", rank, ")")
+    ps_rank <- build_rank_ps(rank)
+    if (method == "clr+euclidean") {
+      ps_rank <- transform_sample_counts(ps_rank, function(x) {
+        x <- x + 1
+        logx <- log(x)
+        logx - mean(logx)
+      })
+      dist <- phyloseq::distance(ps_rank, method = "euclidean")
+    } else {
+      dist <- phyloseq::distance(ps_rank, method = method)
+    }
+    mat <- as.matrix(dist)
+    if (!nrow(mat)) next
+    samples <- rownames(mat)
+    idx_pairs <- which(upper.tri(mat), arr.ind = TRUE)
+    rows <- data.frame(
+      Sample1 = samples[idx_pairs[, 1]],
+      Sample2 = samples[idx_pairs[, 2]],
+      Metric = method,
+      Rank = rank,
+      Distance = mat[idx_pairs],
+      row.names = NULL,
+      stringsAsFactors = FALSE
+    )
+    all_rows[[paste(method, rank, sep = "_")]] <- rows
+  }
 }
 
 output <- bind_rows(all_rows)

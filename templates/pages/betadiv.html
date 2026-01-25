@@ -18,10 +18,16 @@
     <div class="chart-card full-width loading-container" id="betaPanelCard">
       <div class="chart-title" id="betaPanelTitle">Beta diversity by condition</div>
       <div class="panel-controls">
+        <label for="betaRankSelect">Rank</label>
+        <select id="betaRankSelect"></select>
         <label for="betaMetricSelect">Metric</label>
         <select id="betaMetricSelect"></select>
         <label for="betaConditionSelect">x-Axis</label>
         <select id="betaConditionSelect"></select>
+        <label class="zero-toggle">
+          <input id="betaShowPoints" type="checkbox" />
+          Dots
+        </label>
         <span class="refresh-control">
           <button id="betaRefreshPanel" class="refresh-button" type="button">Refresh</button>
           <label class="auto-refresh">

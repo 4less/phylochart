@@ -146,9 +146,3 @@ test %>% group_by(Sample) %>%
   summarize(total = sum(Abundance))
 
 
-
-ps %>% otu_table() %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column("Sample") %>%
-  select(Sample, "1000IBD00030")
-  View()

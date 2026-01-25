@@ -1,2 +1,45 @@
 <section class="page" id="page-pcoa" hidden>
+  <header class="page-header">
+    <div class="header-bar">
+      <img
+        src="assets/logo_horizonal_export_white.svg"
+        alt="Phylochart logo"
+        class="logo"
+      />
+    </div>
+    <div class="header-text">
+      <h1>PCoA overview</h1>
+      <p class="subtitle">
+        Ordination of sample distances across ranks and metrics.
+      </p>
+    </div>
+  </header>
+  <div class="charts">
+    <div class="chart-card full-width loading-container" id="pcoaPanelCard">
+      <div class="chart-title" id="pcoaPanelTitle">PCoA by condition</div>
+      <div class="panel-controls">
+        <label for="pcoaRankSelect">Rank</label>
+        <select id="pcoaRankSelect"></select>
+        <label for="pcoaMetricSelect">Metric</label>
+        <select id="pcoaMetricSelect"></select>
+        <label for="pcoaMethodSelect">Method</label>
+        <select id="pcoaMethodSelect"></select>
+        <label for="pcoaColorSelect">Color by</label>
+        <select id="pcoaColorSelect"></select>
+        <span class="refresh-control">
+          <button id="pcoaRefreshPanel" class="refresh-button" type="button">Refresh</button>
+          <label class="auto-refresh">
+            <input id="pcoaAutoRefresh" type="checkbox" />
+            Auto
+          </label>
+        </span>
+      </div>
+      <div id="pcoaChartPanel"></div>
+      <div class="loading-overlay" id="pcoaPanelLoading" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        Loading PCoA...
+      </div>
+    </div>
+  </div>
+  <div id="pcoaStatus">Waiting for PCoA data...</div>
 </section>

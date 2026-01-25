@@ -13,6 +13,7 @@ ALPHA_PLACEHOLDER = "<!-- ALPHA_DATA -->"
 ALPHA_STATS_PLACEHOLDER = "<!-- ALPHA_STATS -->"
 BETA_PLACEHOLDER = "<!-- BETA_DATA -->"
 BETA_STATS_PLACEHOLDER = "<!-- BETA_STATS -->"
+PCOA_PLACEHOLDER = "<!-- PCOA_DATA -->"
 
 PAGE_ORDER = [
     "taxprofile",
@@ -58,6 +59,12 @@ def infer_beta_stats_path(beta_path: Path) -> Path:
     if "beta" in name:
         return beta_path.with_name(name.replace("beta", "beta_stats", 1))
     return beta_path.with_name("beta_stats.tsv")
+
+def infer_pcoa_path(taxa_path: Path) -> Path:
+    name = taxa_path.name
+    if "taxa" in name:
+        return taxa_path.with_name(name.replace("taxa", "pcoa", 1))
+    return taxa_path.with_name("pcoa.tsv")
 
 
 def split_taxa_table(text: str) -> tuple[str, str]:
@@ -217,6 +224,10 @@ def main() -> None:
         raise SystemExit(
             f"Missing placeholder {BETA_STATS_PLACEHOLDER} in {TEMPLATE_PATH}."
         )
+    if PCOA_PLACEHOLDER not in template:
+        raise SystemExit(
+            f"Missing placeholder {PCOA_PLACEHOLDER} in {TEMPLATE_PATH}."
+        )
 
     pages = load_page_sections()
 
@@ -271,12 +282,25 @@ def main() -> None:
             f'\n    <script type="text/plain" id="betaStats">\n{stats_text}\n    </script>\n'
         )
 
+    pcoa_path = Path(args.pcoa_flag) if args.pcoa_flag else None
+    if pcoa_path is None:
+        inferred = infer_pcoa_path(data_path)
+        if inferred.exists():
+            pcoa_path = inferred
+    pcoa_embedded = "\n"
+    if pcoa_path and pcoa_path.exists():
+        pcoa_text = pcoa_path.read_text().rstrip("\n")
+        pcoa_embedded = (
+            f'\n    <script type="text/plain" id="pcoaData">\n{pcoa_text}\n    </script>\n'
+        )
+
     output = template.replace(PAGES_PLACEHOLDER, pages, 1)
     output = output.replace(PLACEHOLDER, embedded, 1)
     output = output.replace(ALPHA_PLACEHOLDER, alpha_embedded, 1)
     output = output.replace(ALPHA_STATS_PLACEHOLDER, alpha_stats_embedded, 1)
     output = output.replace(BETA_PLACEHOLDER, beta_embedded, 1)
     output = output.replace(BETA_STATS_PLACEHOLDER, beta_stats_embedded, 1)
+    output = output.replace(PCOA_PLACEHOLDER, pcoa_embedded, 1)
     OUTPUT_PATH.write_text(output)
     print(f"Wrote {OUTPUT_PATH}")
 

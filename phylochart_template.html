@@ -781,6 +781,7 @@
     <!-- ALPHA_STATS -->
     <!-- BETA_DATA -->
     <!-- BETA_STATS -->
+    <!-- PCOA_DATA -->
 
     <script>
       const TOP_N = 15;
@@ -864,8 +865,11 @@
         rows: [],
         metrics: [],
         metaColumns: [],
+        ranks: [],
         metric: null,
+        rank: null,
         condition: "All",
+        showPoints: false,
         pending: null,
         dirty: false,
         autoRefresh: false,
@@ -875,12 +879,28 @@
         rows: [],
       };
 
+      const pcoaState = {
+        rows: [],
+        metrics: [],
+        ranks: [],
+        methods: [],
+        metaColumns: [],
+        metric: null,
+        rank: null,
+        method: "PCoA",
+        colorCondition: "All",
+        pending: null,
+        dirty: false,
+        autoRefresh: false,
+      };
+
       const filterState = {
         selections: new Map(),
         values: new Map(),
       };
 
       let alphaSignificantDataTable = null;
+      let betaStatsDataTable = null;
 
       const MISSING_LABEL = "(Missing)";
 
@@ -944,8 +964,24 @@
         const rows = parseTSV(text);
         rows.forEach((row) => {
           row.Distance = Number(row.Distance);
+          row.Rank = row.Rank || "All";
         });
         return rows;
+      }
+
+      function parsePcoaRows(text, metaRows) {
+        const rows = parseTSV(text);
+        rows.forEach((row) => {
+          row.Axis1 = Number(row.Axis1 ?? row.PC1);
+          row.Axis2 = Number(row.Axis2 ?? row.PC2);
+          row.Axis3 = Number(row.Axis3 ?? row.PC3);
+          row.Var1 = Number(row.Var1 ?? row.PC1Var);
+          row.Var2 = Number(row.Var2 ?? row.PC2Var);
+          row.Var3 = Number(row.Var3 ?? row.PC3Var);
+          row.Rank = row.Rank || "All";
+          row.Method = row.Method || "PCoA";
+        });
+        return ensureAllColumn(mergeWithMeta(rows, metaRows));
       }
 
       function sampleLabel(row) {
@@ -1003,6 +1039,16 @@
           const value1 = normalizeMetaValue(meta1[column]);
           const value2 = normalizeMetaValue(meta2[column]);
           if (!selected.has(value1) || !selected.has(value2)) return false;
+        }
+        return true;
+      }
+
+      function pcoaRowPassesFilters(row) {
+        if (!filterState.selections.size) return true;
+        for (const [column, selected] of filterState.selections.entries()) {
+          if (!selected || !selected.size) return false;
+          const value = normalizeMetaValue(row[column]);
+          if (!selected.has(value)) return false;
         }
         return true;
       }
@@ -1370,6 +1416,9 @@
         }
         if (betaState.rows.length) {
           renderBetaPanel();
+        }
+        if (pcoaState.rows.length) {
+          renderPcoaPanel();
         }
       }
 
@@ -2371,6 +2420,14 @@
             : null;
           return dataMax === null ? null : dataMax * 1.05;
         };
+        const buildAxisMin = (stats) => {
+          const dataMin = stats.length
+            ? Math.min(...stats.filter(Boolean).map((row) => row[0]))
+            : null;
+          if (dataMin === null) return 0;
+          if (dataMin === 0) return 0;
+          return dataMin * 0.95;
+        };
 
         const formatTooltipValue = (value) => Highcharts.numberFormat(value, 4);
 
@@ -2732,7 +2789,7 @@
               title: { text: xAxisTitle },
             },
             yAxis: {
-              min: 0,
+              min: buildAxisMin(stats),
               max: buildAxisMax(stats),
               title: { text: yAxisTitle },
               labels: { formatter: formatAxisLabel },
@@ -2875,8 +2932,13 @@
 
         const metric = betaState.metric;
         const condition = betaState.condition;
+        const rank = betaState.rank;
+        const showPoints = betaState.showPoints;
         const filtered = betaState.rows.filter(
-          (row) => row.Metric === metric && betaRowPassesFilters(row)
+          (row) =>
+            row.Metric === metric &&
+            row.Rank === rank &&
+            betaRowPassesFilters(row)
         );
 
         if (!filtered.length) {
@@ -2885,7 +2947,7 @@
         }
 
         if (panelTitle) {
-          panelTitle.textContent = `${metric} distances by condition`;
+          panelTitle.textContent = `${metric} distances by condition (${rank})`;
         }
 
         panel.innerHTML = '<div id="betaChart"></div>';
@@ -2947,6 +3009,27 @@
         const yMax = maxValue === null ? null : Math.min(1, maxValue * 1.05);
         const jitterAmount = 0.18;
 
+        const series = [
+          {
+            name: metric,
+            data: stats,
+            color: PALETTE[0],
+            lineWidth: 1.5,
+          },
+        ];
+        if (showPoints) {
+          series.push({
+            type: "scatter",
+            name: metric,
+            data: scatter,
+            color: PALETTE[3],
+            jitter: { x: jitterAmount },
+            pointPlacement: 0,
+            marker: { radius: 3, lineWidth: 0 },
+            showInLegend: false,
+          });
+        }
+
         Highcharts.chart("betaChart", {
           chart: {
             type: "boxplot",
@@ -2982,24 +3065,7 @@
               ].join("");
             },
           },
-          series: [
-            {
-              name: metric,
-              data: stats,
-              color: PALETTE[0],
-              lineWidth: 1.5,
-            },
-            {
-              type: "scatter",
-              name: metric,
-              data: scatter,
-              color: PALETTE[3],
-              jitter: { x: jitterAmount },
-              pointPlacement: 0,
-              marker: { radius: 3, lineWidth: 0 },
-              showInLegend: false,
-            },
-          ],
+          series,
           credits: { enabled: false },
         });
 
@@ -3063,14 +3129,14 @@
         }
 
         if (statsContainer) {
+          if (betaStatsDataTable) {
+            betaStatsDataTable.destroy();
+            betaStatsDataTable = null;
+          }
           if (!betaStats.rows.length) {
             statsContainer.innerHTML = "";
-          } else if (!condition || condition === "All") {
-            statsContainer.innerHTML = "<div>No x-Axis selected for PERMANOVA.</div>";
           } else {
-            const filteredStats = betaStats.rows.filter(
-              (row) => row.Metric === metric && row.MetaColumn === condition
-            );
+            const filteredStats = betaStats.rows;
             if (!filteredStats.length) {
               statsContainer.innerHTML = "<div>No PERMANOVA results for this selection.</div>";
             } else {
@@ -3080,11 +3146,34 @@
                 if (num < 0.001) return "<0.001";
                 return num.toFixed(3);
               };
+              const rows = filteredStats
+                .map((row) => {
+                  const r2 = Number(row.R2);
+                  const fValue = Number(row.F);
+                  return `
+                    <tr>
+                      <td>${row.Test || "global"}</td>
+                      <td>${row.Comparison || "All"}</td>
+                      <td>${row.Metric}</td>
+                      <td>${row.Rank || "All"}</td>
+                      <td>${row.MetaColumn}</td>
+                      <td>${row.Df}</td>
+                      <td>${Number.isFinite(r2) ? r2.toFixed(4) : "-"}</td>
+                      <td>${Number.isFinite(fValue) ? fValue.toFixed(3) : "-"}</td>
+                      <td>${formatP(row.PValue)}</td>
+                      <td>${formatP(row.PAdj)}</td>
+                    </tr>
+                  `;
+                })
+                .join("");
               statsContainer.innerHTML = `
-                <table class="alpha-summary-table">
+                <table id="betaStatsDataTable" class="display" style="width:100%">
                   <thead>
                     <tr>
+                      <th>Test</th>
+                      <th>Comparison</th>
                       <th>Metric</th>
+                      <th>Rank</th>
                       <th>Meta</th>
                       <th>Df</th>
                       <th>R2</th>
@@ -3094,27 +3183,245 @@
                     </tr>
                   </thead>
                   <tbody>
-                    ${filteredStats
-                      .map(
-                        (row) => `
-                          <tr>
-                            <td>${row.Metric}</td>
-                            <td>${row.MetaColumn}</td>
-                            <td>${row.Df}</td>
-                            <td>${Number(row.R2).toFixed(4)}</td>
-                            <td>${Number(row.F).toFixed(3)}</td>
-                            <td>${formatP(row.PValue)}</td>
-                            <td>${formatP(row.PAdj)}</td>
-                          </tr>
-                        `
-                      )
-                      .join("")}
+                    ${rows}
                   </tbody>
                 </table>
               `;
+              if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable) {
+                betaStatsDataTable = window.jQuery(
+                  "#betaStatsDataTable"
+                ).DataTable({
+                  paging: true,
+                  pageLength: 10,
+                  lengthChange: true,
+                  info: true,
+                  order: [[9, "asc"]],
+                });
+              }
             }
           }
         }
+      }
+
+      function adjustViewportAfterRender(panelId, renderFn) {
+        const panel = document.getElementById(panelId);
+        const topBefore = panel ? panel.getBoundingClientRect().top : null;
+        renderFn();
+        if (!panel || topBefore === null) return;
+        const topAfter = panel.getBoundingClientRect().top;
+        const delta = topAfter - topBefore;
+        if (delta) {
+          window.scrollBy(0, delta);
+        }
+      }
+
+      function renderPcoaPanel() {
+        const panel = document.getElementById("pcoaChartPanel");
+        const panelTitle = document.getElementById("pcoaPanelTitle");
+        if (!panel) return;
+
+        const renderEmpty = (message) => {
+          panel.innerHTML = '<div id="pcoaChart"></div>';
+          if (panelTitle) {
+            panelTitle.textContent = "PCoA by condition";
+          }
+          Highcharts.chart("pcoaChart", {
+            chart: {
+              type: "scatter",
+              height: 900,
+              backgroundColor: "transparent",
+            },
+            title: { text: null },
+            subtitle: { text: message },
+            xAxis: { title: { text: "" } },
+            yAxis: { title: { text: "" } },
+            legend: { enabled: false },
+            series: [],
+            credits: { enabled: false },
+          });
+        };
+
+        if (!pcoaState.rows.length) {
+          renderEmpty("No PCoA data loaded.");
+          return;
+        }
+
+        const metric = pcoaState.metric;
+        const rank = pcoaState.rank;
+        const method = pcoaState.method;
+        const colorCondition = pcoaState.colorCondition;
+        const filtered = pcoaState.rows.filter(
+          (row) =>
+            row.Metric === metric &&
+            row.Rank === rank &&
+            row.Method === method &&
+            pcoaRowPassesFilters(row)
+        );
+        if (!filtered.length) {
+          renderEmpty("No data for the selected options.");
+          return;
+        }
+
+        const varRow = filtered.find((row) => Number.isFinite(row.Var1)) || {};
+        const pc1Var = Number(varRow.Var1);
+        const pc2Var = Number(varRow.Var2);
+        const formatVar = (value) =>
+          Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "";
+
+        if (panelTitle) {
+          panelTitle.textContent = `${metric} ${method} (${rank})`;
+        }
+
+        const groups = new Map();
+        filtered.forEach((row) => {
+          const key =
+            colorCondition && colorCondition !== "All"
+              ? normalizeMetaValue(row[colorCondition])
+              : "All";
+          if (!groups.has(key)) {
+            groups.set(key, []);
+          }
+          groups.get(key).push(row);
+        });
+
+        const groupKeys = [...groups.keys()].sort((a, b) =>
+          String(a).localeCompare(String(b))
+        );
+
+        const rgbaFromHex = (hex, alpha) => {
+          if (!hex || hex[0] !== "#" || (hex.length !== 7 && hex.length !== 4)) {
+            return hex;
+          }
+          const normalized =
+            hex.length === 4
+              ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+              : hex;
+          const r = parseInt(normalized.slice(1, 3), 16);
+          const g = parseInt(normalized.slice(3, 5), 16);
+          const b = parseInt(normalized.slice(5, 7), 16);
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        };
+
+        const buildEllipsePoints = (points, scale) => {
+          if (points.length < 3) return null;
+          const xs = points.map((p) => p.Axis1);
+          const ys = points.map((p) => p.Axis2);
+          const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+          const meanY = ys.reduce((a, b) => a + b, 0) / ys.length;
+          let sxx = 0;
+          let syy = 0;
+          let sxy = 0;
+          for (let i = 0; i < xs.length; i += 1) {
+            const dx = xs[i] - meanX;
+            const dy = ys[i] - meanY;
+            sxx += dx * dx;
+            syy += dy * dy;
+            sxy += dx * dy;
+          }
+          const denom = Math.max(1, xs.length - 1);
+          sxx /= denom;
+          syy /= denom;
+          sxy /= denom;
+          const trace = sxx + syy;
+          const det = sxx * syy - sxy * sxy;
+          const term = Math.sqrt(Math.max(0, trace * trace / 4 - det));
+          const eig1 = trace / 2 + term;
+          const eig2 = trace / 2 - term;
+          if (!Number.isFinite(eig1) || !Number.isFinite(eig2)) return null;
+          const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+          const major = Math.sqrt(Math.max(0, eig1) * scale);
+          const minor = Math.sqrt(Math.max(0, eig2) * scale);
+          if (!Number.isFinite(major) || !Number.isFinite(minor)) return null;
+          const steps = 64;
+          const pointsOut = [];
+          for (let i = 0; i <= steps; i += 1) {
+            const theta = (i / steps) * Math.PI * 2;
+            const cosT = Math.cos(theta);
+            const sinT = Math.sin(theta);
+            const x =
+              meanX + major * cosT * Math.cos(angle) - minor * sinT * Math.sin(angle);
+            const y =
+              meanY + major * cosT * Math.sin(angle) + minor * sinT * Math.cos(angle);
+            pointsOut.push([x, y]);
+          }
+          return pointsOut;
+        };
+
+          const ellipseScale = 5.991; // 95% chi-square for 2 dof
+        const ellipseSeries = [];
+          const scatterSeries = groupKeys.map((key, idx) => {
+            const color = PALETTE[idx % PALETTE.length];
+            const points = groups.get(key) || [];
+            const ellipse = buildEllipsePoints(points, ellipseScale);
+            if (ellipse) {
+              const ellipseFill = rgbaFromHex(color, 0.3);
+              ellipseSeries.push({
+                type: "polygon",
+                name: `${key} ellipse`,
+                data: ellipse,
+                color: ellipseFill,
+                fillColor: ellipseFill,
+                lineColor: color,
+                lineWidth: 1.5,
+                enableMouseTracking: false,
+                marker: { enabled: false },
+                showInLegend: false,
+                zIndex: 1,
+              });
+          }
+          return {
+            name: key,
+            color,
+            data: points.map((row) => ({
+              x: row.Axis1,
+              y: row.Axis2,
+              name: row.Sample,
+            })),
+            zIndex: 2,
+          };
+        });
+
+        panel.innerHTML = '<div id="pcoaChart"></div>';
+        Highcharts.chart("pcoaChart", {
+          chart: {
+            type: "scatter",
+            height: 900,
+            backgroundColor: "transparent",
+            zoomType: "xy",
+          },
+          title: { text: null },
+          xAxis: {
+            title: {
+              text: `${method === "NMDS" ? "NMDS1" : "PC1"} ${formatVar(pc1Var)}`.trim(),
+            },
+          },
+          yAxis: {
+            title: {
+              text: `${method === "NMDS" ? "NMDS2" : "PC2"} ${formatVar(pc2Var)}`.trim(),
+            },
+          },
+          legend: { enabled: groupKeys.length > 1 },
+          tooltip: {
+            formatter: function () {
+              return [
+                `<b>${this.point.name}</b><br/>`,
+                `${method === "NMDS" ? "NMDS1" : "PC1"}: ${this.x.toFixed(3)}<br/>`,
+                `${method === "NMDS" ? "NMDS2" : "PC2"}: ${this.y.toFixed(3)}<br/>`,
+                groupKeys.length > 1 ? `Group: ${this.series.name}` : "",
+              ].join("");
+            },
+          },
+          plotOptions: {
+            scatter: {
+              marker: { radius: 4, lineWidth: 0 },
+            },
+            series: {
+              turboThreshold: 0,
+            },
+          },
+          series: [...ellipseSeries, ...scatterSeries],
+          credits: { enabled: false },
+        });
       }
 
       function renderCharts(rank, groupBy, taxonOrder) {
@@ -3810,7 +4117,7 @@
                 setLoading("alphaPanelLoading", true);
                 requestAnimationFrame(() => {
                   try {
-                    renderAlphaPanel();
+                    adjustViewportAfterRender("alphaChartPanel", renderAlphaPanel);
                   } finally {
                     setLoading("alphaPanelLoading", false);
                   }
@@ -3839,18 +4146,35 @@
             betaStatsEl && betaStatsEl.textContent.trim()
               ? parseTSV(betaStatsEl.textContent)
               : [];
+          betaStats.rows.forEach((row) => {
+            row.Rank = row.Rank || "All";
+          });
           if (betaTextEl && betaTextEl.textContent.trim()) {
             betaState.rows = parseBetaRows(betaTextEl.textContent);
             betaState.metrics = [
               ...new Set(betaState.rows.map((row) => row.Metric)),
             ].sort((a, b) => String(a).localeCompare(String(b)));
+            betaState.ranks = [
+              ...new Set(betaState.rows.map((row) => row.Rank || "All")),
+            ].sort((a, b) => String(a).localeCompare(String(b)));
             betaState.metaColumns = state.metaColumns.slice();
             if (betaState.metrics.length) {
+              const betaRankSelect = document.getElementById("betaRankSelect");
               const betaMetricSelect = document.getElementById("betaMetricSelect");
               const betaConditionSelect = document.getElementById("betaConditionSelect");
               const betaRefreshButton = document.getElementById("betaRefreshPanel");
               const betaAutoRefresh = document.getElementById("betaAutoRefresh");
+              const betaShowPoints = document.getElementById("betaShowPoints");
 
+              if (betaRankSelect) {
+                betaRankSelect.innerHTML = "";
+                betaState.ranks.forEach((rank) => {
+                  const option = document.createElement("option");
+                  option.value = rank;
+                  option.textContent = rank;
+                  betaRankSelect.appendChild(option);
+                });
+              }
               if (betaMetricSelect) {
                 betaMetricSelect.innerHTML = "";
                 betaState.metrics.forEach((metric) => {
@@ -3871,11 +4195,18 @@
               }
 
               betaState.metric = betaState.metrics[0];
+              betaState.rank = betaState.ranks.includes("Genus")
+                ? "Genus"
+                : betaState.ranks[0] || "All";
               betaState.condition = betaState.metaColumns[0] || "All";
               betaState.pending = {
+                rank: betaState.rank,
                 metric: betaState.metric,
                 condition: betaState.condition,
               };
+              if (betaRankSelect) {
+                betaRankSelect.value = betaState.rank;
+              }
               if (betaMetricSelect) {
                 betaMetricSelect.value = betaState.metric;
               }
@@ -3892,6 +4223,23 @@
                 betaAutoRefresh.addEventListener("change", (event) => {
                   betaState.autoRefresh = event.target.checked;
                   if (betaState.autoRefresh && betaState.dirty && betaRefreshButton) {
+                    betaRefreshButton.click();
+                  }
+                });
+              }
+              if (betaShowPoints) {
+                betaShowPoints.checked = betaState.showPoints;
+                betaShowPoints.addEventListener("change", (event) => {
+                  betaState.showPoints = event.target.checked;
+                  renderBetaPanel();
+                });
+              }
+              if (betaRankSelect) {
+                betaRankSelect.addEventListener("change", (event) => {
+                  betaState.pending.rank = event.target.value;
+                  betaState.dirty = true;
+                  updateBetaRefreshState();
+                  if (betaState.autoRefresh && betaRefreshButton) {
                     betaRefreshButton.click();
                   }
                 });
@@ -3918,6 +4266,7 @@
               }
               if (betaRefreshButton) {
                 betaRefreshButton.addEventListener("click", () => {
+                  betaState.rank = betaState.pending.rank;
                   betaState.metric = betaState.pending.metric;
                   betaState.condition = betaState.pending.condition;
                   betaState.dirty = false;
@@ -3925,7 +4274,7 @@
                   setLoading("betaPanelLoading", true);
                   requestAnimationFrame(() => {
                     try {
-                      renderBetaPanel();
+                      adjustViewportAfterRender("betaChartPanel", renderBetaPanel);
                     } finally {
                       setLoading("betaPanelLoading", false);
                     }
@@ -3944,6 +4293,179 @@
             }
           } else if (betaStatus) {
             betaStatus.textContent = "No beta diversity data embedded.";
+          }
+
+          const pcoaTextEl = document.getElementById("pcoaData");
+          const pcoaStatus = document.getElementById("pcoaStatus");
+          if (pcoaTextEl && pcoaTextEl.textContent.trim()) {
+            pcoaState.rows = parsePcoaRows(pcoaTextEl.textContent, metaRows);
+            pcoaState.metrics = [
+              ...new Set(pcoaState.rows.map((row) => row.Metric)),
+            ].sort((a, b) => String(a).localeCompare(String(b)));
+            pcoaState.ranks = [
+              ...new Set(pcoaState.rows.map((row) => row.Rank || "All")),
+            ].sort((a, b) => String(a).localeCompare(String(b)));
+            pcoaState.methods = [
+              ...new Set(pcoaState.rows.map((row) => row.Method || "PCoA")),
+            ].sort((a, b) => String(a).localeCompare(String(b)));
+            pcoaState.metaColumns = state.metaColumns.slice();
+            if (pcoaState.metrics.length && pcoaState.ranks.length) {
+              const pcoaRankSelect = document.getElementById("pcoaRankSelect");
+              const pcoaMetricSelect = document.getElementById("pcoaMetricSelect");
+              const pcoaMethodSelect = document.getElementById("pcoaMethodSelect");
+              const pcoaColorSelect = document.getElementById("pcoaColorSelect");
+              const pcoaRefreshButton = document.getElementById("pcoaRefreshPanel");
+              const pcoaAutoRefresh = document.getElementById("pcoaAutoRefresh");
+
+              if (pcoaRankSelect) {
+                pcoaRankSelect.innerHTML = "";
+                pcoaState.ranks.forEach((rank) => {
+                  const option = document.createElement("option");
+                  option.value = rank;
+                  option.textContent = rank;
+                  pcoaRankSelect.appendChild(option);
+                });
+              }
+              if (pcoaMetricSelect) {
+                pcoaMetricSelect.innerHTML = "";
+                pcoaState.metrics.forEach((metric) => {
+                  const option = document.createElement("option");
+                  option.value = metric;
+                  option.textContent = metric;
+                  pcoaMetricSelect.appendChild(option);
+                });
+              }
+              if (pcoaMethodSelect) {
+                pcoaMethodSelect.innerHTML = "";
+                pcoaState.methods.forEach((method) => {
+                  const option = document.createElement("option");
+                  option.value = method;
+                  option.textContent = method;
+                  pcoaMethodSelect.appendChild(option);
+                });
+              }
+              if (pcoaColorSelect) {
+                pcoaColorSelect.innerHTML = "";
+                pcoaState.metaColumns.forEach((column) => {
+                  const option = document.createElement("option");
+                  option.value = column;
+                  option.textContent = column;
+                  pcoaColorSelect.appendChild(option);
+                });
+              }
+
+              pcoaState.metric = pcoaState.metrics[0];
+              pcoaState.rank = pcoaState.ranks.includes("Genus")
+                ? "Genus"
+                : pcoaState.ranks[0] || "All";
+              pcoaState.method = pcoaState.methods.includes("PCoA")
+                ? "PCoA"
+                : pcoaState.methods[0] || "PCoA";
+              pcoaState.colorCondition = "All";
+              pcoaState.pending = {
+                rank: pcoaState.rank,
+                metric: pcoaState.metric,
+                method: pcoaState.method,
+                colorCondition: pcoaState.colorCondition,
+              };
+              if (pcoaRankSelect) {
+                pcoaRankSelect.value = pcoaState.rank;
+              }
+              if (pcoaMetricSelect) {
+                pcoaMetricSelect.value = pcoaState.metric;
+              }
+              if (pcoaMethodSelect) {
+                pcoaMethodSelect.value = pcoaState.method;
+              }
+              if (pcoaColorSelect) {
+                pcoaColorSelect.value = pcoaState.colorCondition;
+              }
+
+              const updatePcoaRefreshState = () => {
+                if (!pcoaRefreshButton) return;
+                pcoaRefreshButton.disabled = !pcoaState.dirty;
+              };
+              if (pcoaAutoRefresh) {
+                pcoaAutoRefresh.checked = pcoaState.autoRefresh;
+                pcoaAutoRefresh.addEventListener("change", (event) => {
+                  pcoaState.autoRefresh = event.target.checked;
+                  if (pcoaState.autoRefresh && pcoaState.dirty && pcoaRefreshButton) {
+                    pcoaRefreshButton.click();
+                  }
+                });
+              }
+
+              if (pcoaRankSelect) {
+                pcoaRankSelect.addEventListener("change", (event) => {
+                  pcoaState.pending.rank = event.target.value;
+                  pcoaState.dirty = true;
+                  updatePcoaRefreshState();
+                  if (pcoaState.autoRefresh && pcoaRefreshButton) {
+                    pcoaRefreshButton.click();
+                  }
+                });
+              }
+              if (pcoaMetricSelect) {
+                pcoaMetricSelect.addEventListener("change", (event) => {
+                  pcoaState.pending.metric = event.target.value;
+                  pcoaState.dirty = true;
+                  updatePcoaRefreshState();
+                  if (pcoaState.autoRefresh && pcoaRefreshButton) {
+                    pcoaRefreshButton.click();
+                  }
+                });
+              }
+              if (pcoaMethodSelect) {
+                pcoaMethodSelect.addEventListener("change", (event) => {
+                  pcoaState.pending.method = event.target.value;
+                  pcoaState.dirty = true;
+                  updatePcoaRefreshState();
+                  if (pcoaState.autoRefresh && pcoaRefreshButton) {
+                    pcoaRefreshButton.click();
+                  }
+                });
+              }
+              if (pcoaColorSelect) {
+                pcoaColorSelect.addEventListener("change", (event) => {
+                  pcoaState.pending.colorCondition = event.target.value;
+                  pcoaState.dirty = true;
+                  updatePcoaRefreshState();
+                  if (pcoaState.autoRefresh && pcoaRefreshButton) {
+                    pcoaRefreshButton.click();
+                  }
+                });
+              }
+
+              if (pcoaRefreshButton) {
+                pcoaRefreshButton.addEventListener("click", () => {
+                  pcoaState.rank = pcoaState.pending.rank;
+                  pcoaState.metric = pcoaState.pending.metric;
+                  pcoaState.method = pcoaState.pending.method;
+                  pcoaState.colorCondition = pcoaState.pending.colorCondition;
+                  pcoaState.dirty = false;
+                  updatePcoaRefreshState();
+                  setLoading("pcoaPanelLoading", true);
+                  requestAnimationFrame(() => {
+                    try {
+                      adjustViewportAfterRender("pcoaChartPanel", renderPcoaPanel);
+                    } finally {
+                      setLoading("pcoaPanelLoading", false);
+                    }
+                  });
+                });
+              }
+              updatePcoaRefreshState();
+              setLoading("pcoaPanelLoading", false);
+              renderPcoaPanel();
+              if (pcoaStatus) {
+                pcoaStatus.textContent =
+                  "Loaded " + pcoaState.rows.length + " PCoA rows.";
+              }
+            } else if (pcoaStatus) {
+              pcoaStatus.textContent = "PCoA data is missing ranks or metrics.";
+            }
+          } else if (pcoaStatus) {
+            pcoaStatus.textContent = "No PCoA data embedded.";
           }
 
           state.mainPending = {
