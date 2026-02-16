@@ -24,10 +24,15 @@ def _package_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _package_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
 def _resolve_template_path(template_path: Path | None) -> Path:
     if template_path is not None:
         return template_path
     for candidate in (
+        _package_dir() / "resources" / "phylochart_template.html",
         Path.cwd() / "phylochart_template.html",
         _package_root() / "phylochart_template.html",
     ):
@@ -40,6 +45,7 @@ def _resolve_pages_dir(pages_dir: Path | None) -> Path:
     if pages_dir is not None:
         return pages_dir
     for candidate in (
+        _package_dir() / "resources" / "templates" / "pages",
         Path.cwd() / "templates/pages",
         _package_root() / "templates/pages",
     ):
@@ -50,6 +56,7 @@ def _resolve_pages_dir(pages_dir: Path | None) -> Path:
 
 def _resolve_assets_dir() -> Path | None:
     for candidate in (
+        _package_dir() / "resources" / "assets",
         Path.cwd() / "assets",
         _package_root() / "assets",
     ):

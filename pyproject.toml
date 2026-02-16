@@ -15,3 +15,11 @@ phylochart = "phylochart.cli:main"
 
 [tool.setuptools]
 packages = ["phylochart"]
+
+[tool.setuptools.package-data]
+phylochart = [
+  "resources/phylochart_template.html",
+  "resources/assets/*.svg",
+  "resources/templates/pages/*.html",
+  "resources/r/*.R",
+]

@@ -21,8 +21,13 @@ def _package_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _package_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
 def _resolve_r_script(script_name: str) -> Path:
     for candidate in (
+        _package_dir() / "resources" / "r" / script_name,
         Path.cwd() / "src" / script_name,
         _package_root() / "src" / script_name,
     ):
