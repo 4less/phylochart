@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phylochart"
+version = "0.1.0"
+description = "CLI for phyloseq exports and phylochart report generation."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+phylochart = "phylochart.cli:main"
+
+[tool.setuptools]
+packages = ["phylochart"]
