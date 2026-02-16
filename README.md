@@ -15,6 +15,7 @@ python -m pip install -e .
 CLI:
 
 ```bash
+phylochart install-rpackages
 phylochart alpha --input phyloseq.rds --output alpha.tsv --output-stats alpha_stats.tsv
 phylochart beta --input phyloseq.rds --output beta.tsv --output-stats beta_stats.tsv
 phylochart pcoa --input phyloseq.rds --output pcoa.tsv

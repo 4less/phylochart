@@ -70,6 +70,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="phylochart command line interface")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    install_r = subparsers.add_parser(
+        "install-rpackages",
+        help="Install required R packages for phylochart exporters.",
+    )
+    install_r.add_argument(
+        "--repos",
+        default="https://cloud.r-project.org",
+        help="CRAN repository URL (default: https://cloud.r-project.org).",
+    )
+
     taxa = subparsers.add_parser("taxa", help="Export taxa table from a phyloseq RDS.")
     taxa.add_argument("--input", required=True, help="Input phyloseq RDS path.")
     taxa.add_argument("--output", required=True, help="Output taxa TSV path.")
@@ -280,6 +290,39 @@ def _run_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_install_rpackages(args: argparse.Namespace) -> int:
+    cran_packages = [
+        "dplyr",
+        "tidyr",
+        "vegan",
+        "purrr",
+        "tibble",
+        "readr",
+    ]
+    bioc_packages = ["phyloseq"]
+    cran_literal = ", ".join(f'"{pkg}"' for pkg in cran_packages)
+    bioc_literal = ", ".join(f'"{pkg}"' for pkg in bioc_packages)
+    expr = f"""
+options(repos = c(CRAN = "{args.repos}"))
+cran_pkgs <- c({cran_literal})
+missing_cran <- setdiff(cran_pkgs, rownames(installed.packages()))
+if (length(missing_cran)) {{
+  install.packages(missing_cran)
+}}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {{
+  install.packages("BiocManager")
+}}
+bioc_pkgs <- c({bioc_literal})
+for (pkg in bioc_pkgs) {{
+  if (!requireNamespace(pkg, quietly = TRUE)) {{
+    BiocManager::install(pkg, ask = FALSE, update = FALSE)
+  }}
+}}
+"""
+    subprocess.run(["Rscript", "-e", expr], check=True)
+    return 0
+
+
 def _run_all(args: argparse.Namespace) -> int:
     output_dir = Path(args.output_dir)
     stats_dir = output_dir / "stats"
@@ -376,6 +419,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.command == "install-rpackages":
+            return _run_install_rpackages(args)
         if args.command == "taxa":
             return _run_taxa(args)
         if args.command == "alpha":
