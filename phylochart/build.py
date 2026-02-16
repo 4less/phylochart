@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 from pathlib import Path
 
 PLACEHOLDER = "<!-- TAXA_DATA -->"
@@ -45,6 +46,28 @@ def _resolve_pages_dir(pages_dir: Path | None) -> Path:
         if candidate.exists():
             return candidate
     raise SystemExit("Could not find templates/pages directory.")
+
+
+def _resolve_assets_dir() -> Path | None:
+    for candidate in (
+        Path.cwd() / "assets",
+        _package_root() / "assets",
+    ):
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _copy_assets_for_report(output_path: Path) -> None:
+    assets_src = _resolve_assets_dir()
+    if assets_src is None:
+        return
+    output_dir = output_path.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    assets_dst = output_dir / "assets"
+    if assets_src.resolve() == assets_dst.resolve():
+        return
+    shutil.copytree(assets_src, assets_dst, dirs_exist_ok=True)
 
 
 def load_page_sections(pages_dir: Path) -> str:
@@ -249,7 +272,9 @@ def build_html(
     output = output.replace(BETA_PLACEHOLDER, beta_embedded, 1)
     output = output.replace(BETA_STATS_PLACEHOLDER, beta_stats_embedded, 1)
     output = output.replace(PCOA_PLACEHOLDER, pcoa_embedded, 1)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(output)
+    _copy_assets_for_report(output_path)
     return output_path
 
 
@@ -314,4 +339,3 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"Wrote {path}")
     return 0
-

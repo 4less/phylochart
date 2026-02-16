@@ -44,28 +44,6 @@ def _infer_stats_output(output_path: Path, token: str, default_name: str) -> Pat
     return output_path.with_name(default_name)
 
 
-def _filter_args(filter_treatment: bool) -> list[str]:
-    if filter_treatment:
-        return ["--filter-treatment"]
-    return ["--no-filter-treatment"]
-
-
-def _add_filter_flags(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--filter-treatment",
-        dest="filter_treatment",
-        action="store_true",
-        default=True,
-        help="Filter rows with missing Treatment metadata (default).",
-    )
-    parser.add_argument(
-        "--no-filter-treatment",
-        dest="filter_treatment",
-        action="store_false",
-        help="Do not filter missing Treatment metadata.",
-    )
-
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="phylochart command line interface")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -83,26 +61,6 @@ def _build_parser() -> argparse.ArgumentParser:
     taxa = subparsers.add_parser("taxa", help="Export taxa table from a phyloseq RDS.")
     taxa.add_argument("--input", required=True, help="Input phyloseq RDS path.")
     taxa.add_argument("--output", required=True, help="Output taxa TSV path.")
-    taxa.add_argument(
-        "--types",
-        choices=("relative", "absolute", "both"),
-        default="both",
-        help="Abundance types to export (default: both).",
-    )
-    taxa.add_argument(
-        "--drop-zeros",
-        dest="drop_zeros",
-        action="store_true",
-        default=True,
-        help="Drop zero-abundance rows (default).",
-    )
-    taxa.add_argument(
-        "--keep-zeros",
-        dest="drop_zeros",
-        action="store_false",
-        help="Keep zero-abundance rows.",
-    )
-    _add_filter_flags(taxa)
 
     alpha = subparsers.add_parser("alpha", help="Export alpha diversity and stats.")
     alpha.add_argument("--input", required=True, help="Input phyloseq RDS path.")
@@ -112,12 +70,10 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Output alpha stats TSV path (default: inferred from --output).",
     )
-    _add_filter_flags(alpha)
 
     alpha_stats = subparsers.add_parser("alpha-stats", help="Export alpha diversity stats only.")
     alpha_stats.add_argument("--input", required=True, help="Input phyloseq RDS path.")
     alpha_stats.add_argument("--output", required=True, help="Output alpha stats TSV path.")
-    _add_filter_flags(alpha_stats)
 
     beta = subparsers.add_parser("beta", help="Export beta diversity and stats.")
     beta.add_argument("--input", required=True, help="Input phyloseq RDS path.")
@@ -127,17 +83,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Output beta stats TSV path (default: inferred from --output).",
     )
-    _add_filter_flags(beta)
 
     beta_stats = subparsers.add_parser("beta-stats", help="Export beta diversity stats only.")
     beta_stats.add_argument("--input", required=True, help="Input phyloseq RDS path.")
     beta_stats.add_argument("--output", required=True, help="Output beta stats TSV path.")
-    _add_filter_flags(beta_stats)
 
     pcoa = subparsers.add_parser("pcoa", help="Export PCoA/NMDS coordinates.")
     pcoa.add_argument("--input", required=True, help="Input phyloseq RDS path.")
     pcoa.add_argument("--output", required=True, help="Output PCoA TSV path.")
-    _add_filter_flags(pcoa)
 
     all_cmd = subparsers.add_parser(
         "all",
@@ -149,28 +102,6 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Output directory. Writes stats under output-dir/stats and report at output-dir/phylochart.html.",
     )
-    all_cmd.add_argument(
-        "--types",
-        choices=("relative", "absolute", "both"),
-        default="both",
-        help="Abundance types for taxa export (default: both).",
-    )
-    all_cmd.add_argument(
-        "--drop-zeros",
-        dest="drop_zeros",
-        action="store_true",
-        default=True,
-        help="Drop zero-abundance rows for taxa export (default).",
-    )
-    all_cmd.add_argument(
-        "--keep-zeros",
-        dest="drop_zeros",
-        action="store_false",
-        help="Keep zero-abundance rows for taxa export.",
-    )
-    all_cmd.add_argument("--template", default=None, help="Optional template path.")
-    all_cmd.add_argument("--pages-dir", default=None, help="Optional pages directory path.")
-    _add_filter_flags(all_cmd)
 
     build = subparsers.add_parser("build", help="Build final phylochart HTML.")
     build.add_argument("--taxa", required=True, help="Input taxa TSV path.")
@@ -196,10 +127,6 @@ def _run_taxa(args: argparse.Namespace) -> int:
         args.input,
         "--output",
         args.output,
-        "--types",
-        args.types,
-        *(_filter_args(args.filter_treatment)),
-        "--drop-zeros" if args.drop_zeros else "--keep-zeros",
     ]
     _run_r_script(R_SCRIPT_BY_COMMAND["taxa"], cmd)
     return 0
@@ -212,7 +139,7 @@ def _run_alpha(args: argparse.Namespace) -> int:
     )
     _run_r_script(
         R_SCRIPT_BY_COMMAND["alpha"],
-        ["--input", args.input, "--output", str(output), *(_filter_args(args.filter_treatment))],
+        ["--input", args.input, "--output", str(output)],
     )
     _run_r_script(
         R_SCRIPT_BY_COMMAND["alpha_stats"],
@@ -221,7 +148,6 @@ def _run_alpha(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(output_stats),
-            *(_filter_args(args.filter_treatment)),
         ],
     )
     return 0
@@ -234,7 +160,7 @@ def _run_beta(args: argparse.Namespace) -> int:
     )
     _run_r_script(
         R_SCRIPT_BY_COMMAND["beta"],
-        ["--input", args.input, "--output", str(output), *(_filter_args(args.filter_treatment))],
+        ["--input", args.input, "--output", str(output)],
     )
     _run_r_script(
         R_SCRIPT_BY_COMMAND["beta_stats"],
@@ -243,7 +169,6 @@ def _run_beta(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(output_stats),
-            *(_filter_args(args.filter_treatment)),
         ],
     )
     return 0
@@ -252,7 +177,7 @@ def _run_beta(args: argparse.Namespace) -> int:
 def _run_alpha_stats(args: argparse.Namespace) -> int:
     _run_r_script(
         R_SCRIPT_BY_COMMAND["alpha_stats"],
-        ["--input", args.input, "--output", args.output, *(_filter_args(args.filter_treatment))],
+        ["--input", args.input, "--output", args.output],
     )
     return 0
 
@@ -260,7 +185,7 @@ def _run_alpha_stats(args: argparse.Namespace) -> int:
 def _run_beta_stats(args: argparse.Namespace) -> int:
     _run_r_script(
         R_SCRIPT_BY_COMMAND["beta_stats"],
-        ["--input", args.input, "--output", args.output, *(_filter_args(args.filter_treatment))],
+        ["--input", args.input, "--output", args.output],
     )
     return 0
 
@@ -268,7 +193,7 @@ def _run_beta_stats(args: argparse.Namespace) -> int:
 def _run_pcoa(args: argparse.Namespace) -> int:
     _run_r_script(
         R_SCRIPT_BY_COMMAND["pcoa"],
-        ["--input", args.input, "--output", args.output, *(_filter_args(args.filter_treatment))],
+        ["--input", args.input, "--output", args.output],
     )
     return 0
 
@@ -343,10 +268,6 @@ def _run_all(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(taxa_path),
-            "--types",
-            args.types,
-            *(_filter_args(args.filter_treatment)),
-            "--drop-zeros" if args.drop_zeros else "--keep-zeros",
         ],
     )
     _run_r_script(
@@ -356,7 +277,6 @@ def _run_all(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(alpha_path),
-            *(_filter_args(args.filter_treatment)),
         ],
     )
     _run_r_script(
@@ -366,7 +286,6 @@ def _run_all(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(alpha_stats_path),
-            *(_filter_args(args.filter_treatment)),
         ],
     )
     _run_r_script(
@@ -376,7 +295,6 @@ def _run_all(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(beta_path),
-            *(_filter_args(args.filter_treatment)),
         ],
     )
     _run_r_script(
@@ -386,7 +304,6 @@ def _run_all(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(beta_stats_path),
-            *(_filter_args(args.filter_treatment)),
         ],
     )
     _run_r_script(
@@ -396,7 +313,6 @@ def _run_all(args: argparse.Namespace) -> int:
             args.input,
             "--output",
             str(pcoa_path),
-            *(_filter_args(args.filter_treatment)),
         ],
     )
 
@@ -408,8 +324,6 @@ def _run_all(args: argparse.Namespace) -> int:
         beta_path=beta_path,
         beta_stats_path=beta_stats_path,
         pcoa_path=pcoa_path,
-        template_path=Path(args.template) if args.template else None,
-        pages_dir=Path(args.pages_dir) if args.pages_dir else None,
     )
     print(f"Wrote {path}")
     return 0
