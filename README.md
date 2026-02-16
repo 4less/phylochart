@@ -1,9 +1,15 @@
 # phylochart
 
-Install locally:
+Install from GitHub (single line):
 
 ```bash
-pip install -e .
+python -m pip install "git+https://github.com/4less/phylochart.git"
+```
+
+Local editable install (optional):
+
+```bash
+python -m pip install -e .
 ```
 
 CLI:
